@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EP2 · Búsqueda y Rescate — Caso 2026-0142</title>
+<style>
+/* Obsidian Telemetry — consola SAR, autocontenida (sin CDN) */
+:root{
+  --sf:#121318; --sf-low:#1a1b21; --sf-c:#1e1f25; --sf-high:#292a2f; --sf-highest:#34343a; --sf-lowest:#0d0e13;
+  --borde:#3d494c; --outline:#869397; --texto:#e3e1e9; --texto-2:#bcc9cd;
+  --primario:#4cd7f6; --primario-c:#06b6d4; --secundario:#adc6ff; --terciario:#ffb3ad; --error:#ffb4ab;
+}
+@font-face{font-family:"Inter";src:url("assets/fonts/inter.woff2") format("woff2");font-weight:100 900;font-display:swap}
+@font-face{font-family:"JetBrains Mono";src:url("assets/fonts/jetbrains-mono.woff2") format("woff2");font-weight:100 900;font-display:swap}
+*{box-sizing:border-box}
+html{color-scheme:dark}
+body{
+  margin:0;color:var(--texto);font:14px/1.55 Inter,system-ui,sans-serif;background:var(--sf-lowest);
+  background-image:linear-gradient(rgba(61,73,76,.15) 1px,transparent 1px),linear-gradient(90deg,rgba(61,73,76,.15) 1px,transparent 1px);
+  background-size:24px 24px;
+}
+.mono{font-family:"JetBrains Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums}
+a{color:inherit}
+::selection{background:rgba(76,215,246,.25)}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--sf-highest);border-radius:6px;border:2px solid var(--sf-lowest)}
+:focus-visible{outline:2px solid var(--primario);outline-offset:2px}
+
+.topbar{display:flex;align-items:baseline;gap:14px;padding:10px 20px;border-bottom:1px solid var(--borde);background:var(--sf);position:sticky;top:0;z-index:5;flex-wrap:wrap}
+.volver{color:var(--texto-2);text-decoration:none;font-size:12px;letter-spacing:.02em;text-underline-offset:3px}
+.volver:hover{color:var(--primario)}
+.topbar h1{font-size:15px;font-weight:600;margin:0;letter-spacing:.01em}
+.topbar h1 span{font-weight:400;color:var(--texto-2)}
+.topbar__reloj{margin-left:auto;color:var(--texto-2);font-size:12px}
+.chip{display:inline-block;font-size:11px;letter-spacing:.03em;padding:1.5px 7px;border-radius:4px;border:1px solid var(--borde);color:var(--texto-2)}
+.chip--demo{color:var(--secundario);border-color:rgba(173,198,255,.35)}
+.chip--medio{font-family:"JetBrains Mono",monospace;color:var(--secundario);border-color:rgba(173,198,255,.35)}
+
+.tablero{display:grid;grid-template-columns:300px minmax(0,1fr) 320px;gap:16px;padding:16px 20px 8px;max-width:1600px;margin:0 auto;align-items:start}
+.columna{display:flex;flex-direction:column;gap:16px;min-width:0}
+.panel{background:var(--sf-c);border:1px solid var(--borde);border-radius:8px;overflow:hidden}
+.panel__cab{display:flex;align-items:baseline;gap:10px;padding:10px 14px;border-bottom:1px solid var(--borde);background:var(--sf-low)}
+.panel__cab h2{font-size:12px;letter-spacing:.08em;text-transform:uppercase;margin:0;color:var(--texto-2);font-weight:600}
+.panel__meta{margin-left:auto;font-size:11px;color:var(--outline);text-align:right}
+.panel__cuerpo{padding:10px 14px 14px}
+
+.ficha{margin:0}
+.ficha > div{display:grid;grid-template-columns:104px minmax(0,1fr);gap:10px;padding:7px 0;border-bottom:1px dashed rgba(61,73,76,.5)}
+.ficha > div:last-child{border-bottom:0}
+.ficha dt{color:var(--outline);font-size:11px;letter-spacing:.04em;text-transform:uppercase;padding-top:2px}
+.ficha dd{margin:0;color:var(--texto-2);font-size:13px}
+
+.citas{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px}
+.cita .fuente{display:block;font-family:"JetBrains Mono",monospace;font-size:11px;color:var(--primario);margin-bottom:2px}
+.cita p{margin:0;font-size:12.5px;color:var(--texto-2)}
+
+.zonas{list-style:none;margin:0;padding:0}
+.zona{padding:11px 0;border-bottom:1px solid rgba(61,73,76,.55)}
+.zona:first-child{padding-top:2px}
+.zona:last-child{border-bottom:0;padding-bottom:8px}
+.zona__cab{display:flex;align-items:baseline;gap:8px}
+.zona__rango{width:20px;height:20px;border-radius:4px;background:var(--sf-highest);color:var(--texto-2);display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;align-self:center}
+.zona__id{font-family:"JetBrains Mono",monospace;font-size:12px;color:var(--primario)}
+.zona__cab h3{margin:0;font-size:13.5px;font-weight:600}
+.zona__alt{margin-left:auto;font-size:12px;color:var(--texto-2)}
+.zona__etiquetas{display:flex;flex-wrap:wrap;gap:6px;margin:7px 0 0}
+.tag{font-size:11px;letter-spacing:.03em;padding:1px 6px;border-radius:4px}
+.tag--contacto{color:var(--primario);border:1px solid rgba(76,215,246,.4)}
+.tag--ruta{color:var(--secundario);border:1px solid rgba(173,198,255,.35)}
+.zona__filas{display:grid;gap:4px;margin:8px 0 0}
+.zona__filas > div{display:grid;grid-template-columns:104px minmax(0,1fr);gap:10px;font-size:12.5px}
+.zona__filas dt{color:var(--outline);font-size:11px;letter-spacing:.04em;text-transform:uppercase;padding-top:1px}
+.zona__filas dd{margin:0;color:var(--texto-2)}
+
+.fase-grupo{margin:0 0 14px}
+.fase-grupo:last-child{margin-bottom:0}
+.fase-grupo__titulo{margin:0 0 2px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--outline);font-weight:600}
+.fase{display:grid;grid-template-columns:56px minmax(0,1fr);gap:10px;padding:9px 0;border-bottom:1px dashed rgba(61,73,76,.5)}
+.fase:last-child{border-bottom:0}
+.fase__zona{font-family:"JetBrains Mono",monospace;font-size:12px;color:var(--primario);padding-top:2px}
+.fase h3{margin:0 0 2px;font-size:13px;font-weight:600}
+.fase__objetivo{margin:0;color:var(--texto-2);font-size:12.5px}
+.fase__medios{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+
+.medios{list-style:none;margin:0;padding:0}
+.medio{padding:10px 0;border-bottom:1px solid rgba(61,73,76,.55)}
+.medio:first-child{padding-top:2px}
+.medio:last-child{border-bottom:0;padding-bottom:8px}
+.medio__cab{display:flex;align-items:baseline;gap:8px}
+.medio__cab span:first-child{font-family:"JetBrains Mono",monospace;font-size:12px;color:var(--primario)}
+.medio__tipo{font-size:11px;color:var(--outline);letter-spacing:.04em;text-transform:uppercase}
+.medio h3{margin:1px 0 0;font-size:13px;font-weight:600}
+.medio__meta{margin:2px 0 0;color:var(--texto-2);font-size:12px}
+.medio__restr{margin:2px 0 0;color:var(--outline);font-size:12px}
+
+.clima{width:100%;border-collapse:collapse;font-size:12px}
+.clima th{text-align:left;color:var(--outline);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.05em;padding:4px 6px 4px 0;border-bottom:1px solid var(--borde)}
+.clima td{padding:5px 6px 5px 0;border-bottom:1px dashed rgba(61,73,76,.5);color:var(--texto-2)}
+.clima td.mono{color:var(--texto)}
+.clima tbody tr:last-child td{border-bottom:0}
+.clima .zona-celda{color:var(--texto);font-family:"JetBrains Mono",monospace;font-size:12px;vertical-align:top;padding-top:6px}
+.nota{margin:8px 0 0;font-size:12px;color:var(--outline)}
+
+.pie{border-top:1px solid var(--borde);margin-top:16px;padding:14px 20px 20px;max-width:1600px;margin-left:auto;margin-right:auto;color:var(--outline);font-size:12px;display:grid;gap:6px}
+.pie p{margin:0}
+.pie ul{list-style:none;display:flex;flex-wrap:wrap;gap:4px 14px;margin:0;padding:0}
+.pie li{font-family:"JetBrains Mono",monospace}
+
+@media (max-width:1180px){
+  .tablero{grid-template-columns:300px minmax(0,1fr)}
+  .columna--contexto{grid-column:1/-1}
+  .columna--contexto .panel{flex:1}
+  .columna--contexto{flex-direction:row;flex-wrap:wrap}
+  .columna--contexto .panel{min-width:300px}
+}
+@media (max-width:860px){
+  .tablero{grid-template-columns:1fr}
+  .columna--contexto{flex-direction:column}
+}
+@media (prefers-reduced-motion:no-preference){
+  .columna{animation:entrar .28s ease-out both}
+  .columna:nth-child(2){animation-delay:.06s}
+  .columna:nth-child(3){animation-delay:.12s}
+  @keyframes entrar{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <a class="volver" href="../../ep2-mockups/portada.html">← Centro de Operaciones</a>
+  <h1>Sala de Búsqueda y Rescate <span>caso <!-- datos:caso -->
+2026-0142 (simulado)
+<!-- /datos:caso --></span></h1>
+  <p class="chip chip--demo">Modo demo · datos simulados</p>
+  <time class="mono topbar__reloj" id="reloj">--:--</time>
+</header>
+
+<main class="tablero">
+  <div class="columna">
+    <section class="panel" aria-labelledby="t-caso">
+      <header class="panel__cab"><h2 id="t-caso">Caso</h2><span class="panel__meta">reporte 17-10 22:40</span></header>
+      <div class="panel__cuerpo">
+        <dl class="ficha">
+<!-- datos:ficha -->
+    <div><dt>Persona</dt><dd>M. Torres, 34 años</dd></div>
+    <div><dt>Experiencia</dt><dd>media; excursiones de un día, sin experiencia en altura</dd></div>
+    <div><dt>Equipo declarado</dt><dd>mochila liviana, chaqueta, agua; sin linterna y sin equipo de alta montaña</dd></div>
+    <div><dt>Ruta declarada</dt><dd>ida al Mirador de la cascada (Z-2) y regreso por el camino de servicio (Z-5)</dd></div>
+    <div><dt>Último contacto</dt><dd>17-10 a las 14:05, mensaje con foto desde el mirador (Z-2)</dd></div>
+    <div><dt>Reporte</dt><dd>17-10 a las 22:40; la pareja reporta que no volvió y no responde el teléfono</dd></div>
+    <div><dt>Alertantes</dt><dd>pareja, en la base del sector</dd></div>
+    <div><dt>Notas</dt><dd>noche fría (3-4 °C en zonas bajas); no llevaba linterna ni abrigo de altura</dd></div>
+<!-- /datos:ficha -->
+        </dl>
+      </div>
+    </section>
+    <section class="panel" aria-labelledby="t-criterios">
+      <header class="panel__cab"><h2 id="t-criterios">Criterios del protocolo</h2><span class="panel__meta">por qué este plan</span></header>
+      <div class="panel__cuerpo">
+        <ul class="citas">
+<!-- datos:protocolo -->
+      <li class="cita"><span class="fuente">protocolo-busqueda 2</span><p>fase I nocturna no ingresa a zonas tecnicas ni altas y cierra antes del amanecer</p></li>
+      <li class="cita"><span class="fuente">protocolo-busqueda 3</span><p>helicoptero viento &lt; 35 km/h y visibilidad &gt; 5 km, solo de dia</p></li>
+      <li class="cita"><span class="fuente">protocolo-busqueda 3</span><p>dron viento maximo 40 km/h, solo con luz diurna</p></li>
+      <li class="cita"><span class="fuente">protocolo-busqueda 3</span><p>brigadas y K9 no ingresan a zonas altas (Z-3/Z-4) sin aclimatacion</p></li>
+      <li class="cita"><span class="fuente">criterios-prioridad</span><p>ultimo contacto primero; ruta declarada y variantes despues; tecnicas al final</p></li>
+<!-- /datos:protocolo -->
+        </ul>
+      </div>
+    </section>
+  </div>
+
+  <div class="columna">
+    <section class="panel" aria-labelledby="t-zonas">
+      <header class="panel__cab"><h2 id="t-zonas">Zonas priorizadas</h2><span class="panel__meta"><!-- datos:zonasmeta -->
+orden del plan v1 · 5 zonas
+<!-- /datos:zonasmeta --></span></header>
+      <div class="panel__cuerpo">
+        <ol class="zonas">
+<!-- datos:zonas -->
+      <li class="zona">
+        <div class="zona__cab">
+          <span class="zona__rango">1</span>
+          <span class="zona__id">Z-2</span>
+          <h3>Mirador de la cascada</h3>
+          <span class="zona__alt mono">2100 m</span>
+        </div>
+        <div class="zona__etiquetas"><span class="tag tag--contacto">Último contacto</span><span class="tag tag--ruta">Ruta declarada</span></div>
+        <dl class="zona__filas">
+          <div><dt>Acceso</dt><dd>sendero marcado (1 h de base)</dd></div>
+          <div><dt>Barrido a pie</dt><dd class="mono">1,5 h</dd></div>
+          <div><dt>Dron</dt><dd>adecuado</dd></div>
+          <div><dt>Helicóptero</dt><dd>zona de aterrizaje informal 400 m antes del mirador</dd></div>
+          <div><dt>Refugio</dt><dd>—</dd></div>
+        </dl>
+      </li>
+      <li class="zona">
+        <div class="zona__cab">
+          <span class="zona__rango">2</span>
+          <span class="zona__id">Z-5</span>
+          <h3>Camino de servicio al embalse</h3>
+          <span class="zona__alt mono">1950 m</span>
+        </div>
+        <div class="zona__etiquetas"><span class="tag tag--ruta">Ruta declarada</span></div>
+        <dl class="zona__filas">
+          <div><dt>Acceso</dt><dd>vehicular (40 min de base)</dd></div>
+          <div><dt>Barrido a pie</dt><dd class="mono">2 h</dd></div>
+          <div><dt>Dron</dt><dd>adecuado</dd></div>
+          <div><dt>Helicóptero</dt><dd>tarima junto al embalse</dd></div>
+          <div><dt>Refugio</dt><dd>—</dd></div>
+        </dl>
+      </li>
+      <li class="zona">
+        <div class="zona__cab">
+          <span class="zona__rango">3</span>
+          <span class="zona__id">Z-1</span>
+          <h3>Refugio El Morado y sendero alto</h3>
+          <span class="zona__alt mono">2650 m</span>
+        </div>
+        <dl class="zona__filas">
+          <div><dt>Acceso</dt><dd>vehicular hasta el refugio (1,5 h de base), luego a pie</dd></div>
+          <div><dt>Barrido a pie</dt><dd class="mono">4 h</dd></div>
+          <div><dt>Dron</dt><dd>adecuado</dd></div>
+          <div><dt>Helicóptero</dt><dd>helipuerto de montaña junto al refugio</dd></div>
+          <div><dt>Refugio</dt><dd>Refugio El Morado</dd></div>
+        </dl>
+      </li>
+      <li class="zona">
+        <div class="zona__cab">
+          <span class="zona__rango">4</span>
+          <span class="zona__id">Z-4</span>
+          <h3>Morrena del glaciar bajo</h3>
+          <span class="zona__alt mono">3050 m</span>
+        </div>
+        <dl class="zona__filas">
+          <div><dt>Acceso</dt><dd>a pie por terreno inestable (4,5 h de base)</dd></div>
+          <div><dt>Barrido a pie</dt><dd class="mono">6 h</dd></div>
+          <div><dt>Dron</dt><dd>limitado</dd></div>
+          <div><dt>Helicóptero</dt><dd>no aterriza; solo sobrevuelo</dd></div>
+          <div><dt>Refugio</dt><dd>—</dd></div>
+        </dl>
+      </li>
+      <li class="zona">
+        <div class="zona__cab">
+          <span class="zona__rango">5</span>
+          <span class="zona__id">Z-3</span>
+          <h3>Quebrada del Plomo (zona alta)</h3>
+          <span class="zona__alt mono">3400 m</span>
+        </div>
+        <dl class="zona__filas">
+          <div><dt>Acceso</dt><dd>solo a pie con equipo técnico (5 h de base)</dd></div>
+          <div><dt>Barrido a pie</dt><dd class="mono">7 h</dd></div>
+          <div><dt>Dron</dt><dd>limitado (quebrada encajonada)</dd></div>
+          <div><dt>Helicóptero</dt><dd>no aterriza; solo sobrevuelo</dd></div>
+          <div><dt>Refugio</dt><dd>—</dd></div>
+        </dl>
+      </li>
+<!-- /datos:zonas -->
+        </ol>
+      </div>
+    </section>
+    <section class="panel" aria-labelledby="t-fases">
+      <header class="panel__cab"><h2 id="t-fases">Fases del plan</h2><span class="panel__meta"><!-- datos:planmeta -->
+plan v1 · sin cambios
+<!-- /datos:planmeta --></span></header>
+      <div class="panel__cuerpo">
+<!-- datos:fases -->
+  <section class="fase-grupo">
+    <h3 class="fase-grupo__titulo">Fase nocturna — 17 oct 23:00 → 18 oct 05:00</h3>
+    <div class="fase">
+      <span class="fase__zona">Z-2</span>
+      <div>
+        <h3>Mirador de la cascada</h3>
+        <p class="fase__objetivo">Anclaje nocturno en Mirador de la cascada (senderos y caminos)</p>
+        <div class="fase__medios"><span class="chip chip--medio" title="Brigada nocturna Bravo">EQ-2</span> <span class="chip chip--medio" title="Can de búsqueda Lira">K9-1</span></div>
+      </div>
+    </div>
+    <div class="fase">
+      <span class="fase__zona">Z-5</span>
+      <div>
+        <h3>Camino de servicio al embalse</h3>
+        <p class="fase__objetivo">Anclaje nocturno en Camino de servicio al embalse (senderos y caminos)</p>
+        <div class="fase__medios"><span class="chip chip--medio" title="Brigada nocturna Bravo">EQ-2</span> <span class="chip chip--medio" title="Can de búsqueda Lira">K9-1</span></div>
+      </div>
+    </div>
+  </section>
+  <section class="fase-grupo">
+    <h3 class="fase-grupo__titulo">Fase diurna — 18 oct 06:00 → 18 oct 12:00</h3>
+    <div class="fase">
+      <span class="fase__zona">Z-2</span>
+      <div>
+        <h3>Mirador de la cascada</h3>
+        <p class="fase__objetivo">Barrido diurno de Mirador de la cascada y variantes</p>
+        <div class="fase__medios"><span class="chip chip--medio" title="Helicóptero (convenio Carabineros)">HEL-1</span> <span class="chip chip--medio" title="Dron térmico Cóndor">DR-1</span></div>
+      </div>
+    </div>
+    <div class="fase">
+      <span class="fase__zona">Z-5</span>
+      <div>
+        <h3>Camino de servicio al embalse</h3>
+        <p class="fase__objetivo">Barrido diurno de Camino de servicio al embalse y variantes</p>
+        <div class="fase__medios"><span class="chip chip--medio" title="Helicóptero (convenio Carabineros)">HEL-1</span> <span class="chip chip--medio" title="Dron térmico Cóndor">DR-1</span></div>
+      </div>
+    </div>
+    <div class="fase">
+      <span class="fase__zona">Z-1</span>
+      <div>
+        <h3>Refugio El Morado y sendero alto</h3>
+        <p class="fase__objetivo">Barrido diurno de Refugio El Morado y sendero alto y variantes</p>
+        <div class="fase__medios"><span class="chip chip--medio" title="Brigada de montaña Alfa">EQ-1</span></div>
+      </div>
+    </div>
+  </section>
+<!-- /datos:fases -->
+      </div>
+    </section>
+  </div>
+
+  <div class="columna columna--contexto">
+    <section class="panel" aria-labelledby="t-medios">
+      <header class="panel__cab"><h2 id="t-medios">Medios</h2><span class="panel__meta">disponibilidad y límites</span></header>
+      <div class="panel__cuerpo">
+        <ul class="medios">
+<!-- datos:medios -->
+      <li class="medio">
+        <div class="medio__cab"><span>EQ-1</span><span class="medio__tipo">terrestre</span></div>
+        <h3>Brigada de montaña Alfa</h3>
+        <p class="medio__meta">6 personas · autonomía 8 h · desde 05:30</p>
+        <p class="medio__restr">no ingresa a zonas altas (Z-3/Z-4) sin aclimatación previa</p>
+      </li>
+      <li class="medio">
+        <div class="medio__cab"><span>EQ-2</span><span class="medio__tipo">terrestre</span></div>
+        <h3>Brigada nocturna Bravo</h3>
+        <p class="medio__meta">4 personas · autonomía 6 h · desde 22:45</p>
+        <p class="medio__restr">solo senderos y caminos con iluminación propia; no zonas técnicas</p>
+      </li>
+      <li class="medio">
+        <div class="medio__cab"><span>K9-1</span><span class="medio__tipo">k9</span></div>
+        <h3>Can de búsqueda Lira</h3>
+        <p class="medio__meta">2 personas · autonomía 4 h · desde 23:00</p>
+        <p class="medio__restr">solo senderos limpios; no pendientes técnicas</p>
+      </li>
+      <li class="medio">
+        <div class="medio__cab"><span>DR-1</span><span class="medio__tipo">aereo</span></div>
+        <h3>Dron térmico Cóndor</h3>
+        <p class="medio__meta">2 personas · autonomía 3 h · desde 06:00</p>
+        <p class="medio__restr">viento máximo 40 km/h; solo con luz diurna</p>
+      </li>
+      <li class="medio">
+        <div class="medio__cab"><span>HEL-1</span><span class="medio__tipo">aereo</span></div>
+        <h3>Helicóptero (convenio Carabineros)</h3>
+        <p class="medio__meta">4 personas · autonomía 4 h · desde 06:00</p>
+        <p class="medio__restr">viento &lt; 35 km/h y visibilidad &gt; 5 km en la zona asignada; solo con luz diurna</p>
+      </li>
+<!-- /datos:medios -->
+        </ul>
+      </div>
+    </section>
+    <section class="panel" aria-labelledby="t-clima">
+      <header class="panel__cab"><h2 id="t-clima">Clima en la ventana</h2><span class="panel__meta">simulado</span></header>
+      <div class="panel__cuerpo">
+<!-- datos:clima -->
+<table class="clima">
+        <thead><tr><th>Zona</th><th>Franja</th><th>Viento</th><th>Visib.</th><th>Temp.</th></tr></thead>
+        <tbody>
+        <tr><td class="zona-celda" rowspan="2">Z-2</td>
+          <td>noche</td>
+          <td class="mono">20 km/h</td>
+          <td class="mono">9 km</td>
+          <td class="mono">4 °C</td>
+        </tr>
+        <tr>
+          <td>día</td>
+          <td class="mono">15 km/h</td>
+          <td class="mono">14 km</td>
+          <td class="mono">8 °C</td>
+        </tr>
+        <tr><td class="zona-celda" rowspan="2">Z-5</td>
+          <td>noche</td>
+          <td class="mono">18 km/h</td>
+          <td class="mono">8 km</td>
+          <td class="mono">5 °C</td>
+        </tr>
+        <tr>
+          <td>día</td>
+          <td class="mono">14 km/h</td>
+          <td class="mono">15 km</td>
+          <td class="mono">9 °C</td>
+        </tr>
+        <tr><td class="zona-celda" rowspan="2">Z-1</td>
+          <td>noche</td>
+          <td class="mono">24 km/h</td>
+          <td class="mono">9 km</td>
+          <td class="mono">3 °C</td>
+        </tr>
+        <tr>
+          <td>día</td>
+          <td class="mono">18 km/h</td>
+          <td class="mono">12 km</td>
+          <td class="mono">6 °C</td>
+        </tr>
+        <tr><td class="zona-celda" rowspan="2">Z-4</td>
+          <td>noche</td>
+          <td class="mono">32 km/h</td>
+          <td class="mono">5 km</td>
+          <td class="mono">-3 °C</td>
+        </tr>
+        <tr>
+          <td>día</td>
+          <td class="mono">23 km/h</td>
+          <td class="mono">9 km</td>
+          <td class="mono">-1 °C</td>
+        </tr>
+        <tr><td class="zona-celda" rowspan="2">Z-3</td>
+          <td>noche</td>
+          <td class="mono">30 km/h</td>
+          <td class="mono">6 km</td>
+          <td class="mono">-2 °C</td>
+        </tr>
+        <tr>
+          <td>día</td>
+          <td class="mono">20 km/h</td>
+          <td class="mono">10 km</td>
+          <td class="mono">0 °C</td>
+        </tr>
+        </tbody>
+      </table>
+      <p class="nota">Pronóstico simulado. Solo franjas dentro de la ventana de búsqueda (22:00–06:00 y 06:00–12:00).</p>
+<!-- /datos:clima -->
+      </div>
+    </section>
+  </div>
+</main>
+
+<footer class="pie">
+  <p>Consola generada desde los datos reales del spike por <span class="mono">scripts/generar_consola.py</span> · datos simulados, versionados en el repo.</p>
+  <ul>
+<!-- datos:procedencia -->
+    <li>data/ficha-persona.json</li>
+    <li>data/zonas.json</li>
+    <li>data/equipos.json</li>
+    <li>data/clima.json</li>
+    <li>data/planes/plan-v1.json</li>
+<!-- /datos:procedencia -->
+  </ul>
+</footer>
+
+<script>
+(function(){
+  function p(n){return String(n).padStart(2,"0")}
+  function reloj(){var d=new Date();document.getElementById("reloj").textContent=p(d.getHours())+":"+p(d.getMinutes())+" · hora local"}
+  reloj();setInterval(reloj,30000);
+})();
+</script>
+</body>
+</html>

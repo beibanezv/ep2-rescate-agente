@@ -1,0 +1,24 @@
+Consulta: excursionista desaparecida en El Morado; ultimo contacto 14:05 en el mirador
+LLM: ClienteFalso
+
+--- PLAN v1 (C:\Users\ibane\Desktop\Ing. Soluciones con IA\ep2-rescate-andino\data\planes\plan-v1.json) ---
+Prioridad de zonas: Z-2 > Z-5 > Z-1 > Z-4 > Z-3
+2026-10-17T23:00/2026-10-18T05:00 | Z-2: EQ-2, K9-1 | Anclaje nocturno en Mirador de la cascada (senderos y caminos)
+2026-10-17T23:00/2026-10-18T05:00 | Z-5: EQ-2, K9-1 | Anclaje nocturno en Camino de servicio al embalse (senderos y caminos)
+2026-10-18T06:00/2026-10-18T12:00 | Z-2: HEL-1, DR-1 | Barrido diurno de Mirador de la cascada y variantes
+2026-10-18T06:00/2026-10-18T12:00 | Z-5: HEL-1, DR-1 | Barrido diurno de Camino de servicio al embalse y variantes
+2026-10-18T06:00/2026-10-18T12:00 | Z-1: EQ-1 | Barrido diurno de Refugio El Morado y sendero alto y variantes
+Motivo del cambio: (version inicial)
+Citas: protocolo-busqueda 2: fase I nocturna no ingresa a zonas tecnicas ni altas y cierra antes del amanecer | protocolo-busqueda 3: helicoptero viento < 35 km/h y visibilidad > 5 km, solo de dia | protocolo-busqueda 3: dron viento maximo 40 km/h, solo con luz diurna | protocolo-busqueda 3: brigadas y K9 no ingresan a zonas altas (Z-3/Z-4) sin aclimatacion | criterios-prioridad: ultimo contacto primero; ruta declarada y variantes despues; tecnicas al final
+
+--- PARTE ---
+(respuesta simulada) Decision basada en el contexto recuperado: aplico lo descrito en [F1]. [F1] [F2] [F3] [F4] [F5] [T1] [T2]
+
+Fuentes citadas:   protocolo-busqueda, criterios-prioridad, clima-simulado, equipos-disponibles
+Trace:             C:\Users\ibane\Desktop\Ing. Soluciones con IA\ep2-rescate-andino\logs\trace.jsonl
+
+--- TRAZABILIDAD (trace.jsonl) ---
+[01] planificacion | version=1 | sesion_id=caso-morado
+[02] plan_publicado | archivo=C:\Users\ibane\Desktop\Ing. Soluciones con IA\ep2-rescate-andino\data\planes\plan-v1.json | n_fases=5 | prioridad=Z-2>Z-5>Z-1>Z-4>Z-3 | motivo=(version inicial)
+[03] parte_narrativo | modelo=cliente-falso | cita_plan_previo=False | fuentes_citadas=['protocolo-busqueda', 'criterios-prioridad', 'clima-simulado', 'equipos-disponibles']
+[04] memoria | sesion_id=caso-morado | plan_version=1
