@@ -127,6 +127,19 @@ def test_fase_nocturna_segura(tmp_path, monkeypatch):
     assert not v["puede"]
 
 
+def test_grafo_ejecuta_planificacion_completa(tmp_path, monkeypatch):
+    agente = _agente(tmp_path, _datos(tmp_path), monkeypatch)
+    from agent.grafo import construir_grafo
+
+    estado = construir_grafo(agente).invoke(
+        {"version": 1, "sesion_id": "caso-morado", "consulta": "excursionista desaparecida"}
+    )
+    assert estado["plan"]["version"] == 1
+    assert Path(estado["archivo"]).name == "plan-v1.json"
+    assert estado["parte"]
+    assert estado["cito_plan_previo"] is False
+
+
 def test_publicar_plan_valida_estructura(tmp_path):
     datos = _datos(tmp_path)
     base = {

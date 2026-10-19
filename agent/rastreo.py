@@ -12,6 +12,7 @@ import json
 from pathlib import Path
 
 from agent.agente_base import AgenteBase
+from agent.grafo import EstadoPlan, construir_grafo
 from agent.observabilidad import traceable
 from agent.prompts import SISTEMA_BASE, armar_usuario
 from tools.rastreo import (
@@ -73,6 +74,7 @@ class AgenteRastreo(AgenteBase):
     def __init__(self, *args, dir_datos: str | Path | None = None, **kwargs):
         super().__init__(*args, **kwargs)
         self.dir_datos = Path(dir_datos) if dir_datos else None
+        self.grafo = construir_grafo(self)
 
     def verificaciones_extra(
         self, consulta: str, fragmentos: list, sesion_id: str | None = None
@@ -173,6 +175,83 @@ class AgenteRastreo(AgenteBase):
                 )
         return None
 
+    # Nodos del grafo (agent/grafo.py): cada uno lee y amplia el estado comun.
+    def _nodo_contexto(self, estado: EstadoPlan) -> dict:
+        version = estado["version"]
+        sesion_id = estado.get("sesion_id")
+        consulta = estado.get("consulta", "")
+        self.trazador.registrar("planificacion", version=version, sesion_id=sesion_id)
+        recuerdo = self._recuerdo_plan_previo(sesion_id, version)
+        herramientas = ([recuerdo] if recuerdo else []) + self.verificaciones_extra(
+            consulta, [], sesion_id
+        )
+        fragmentos = self._buscar(consulta or "plan de busqueda por fases de una persona desaparecida")
+        return {"recuerdo": recuerdo, "herramientas": herramientas, "fragmentos": fragmentos}
+
+    def _nodo_calcular(self, estado: EstadoPlan) -> dict:
+        fases, prioridad, motivo, citas = self._construir_plan(estado["version"])
+        return {"fases": fases, "prioridad": prioridad, "motivo": motivo, "citas": citas}
+
+    def _nodo_publicar(self, estado: EstadoPlan) -> dict:
+        publicado = publicar_plan(
+            estado["version"],
+            estado["fases"],
+            estado["prioridad"],
+            estado.get("motivo_cambio") or estado["motivo"],
+            estado["citas"],
+            dir_datos=self.dir_datos,
+        )
+        plan = {
+            k: publicado[k]
+            for k in ("version", "fases", "prioridad_zonas", "motivo_cambio", "citas")
+        }
+        self.trazador.registrar(
+            "plan_publicado",
+            archivo=publicado["archivo"],
+            n_fases=len(estado["fases"]),
+            prioridad=">".join(estado["prioridad"]),
+            motivo=plan["motivo_cambio"] or "(version inicial)",
+        )
+        return {"plan": plan, "archivo": publicado["archivo"]}
+
+    def _nodo_redactar(self, estado: EstadoPlan) -> dict:
+        pedido = (
+            (estado.get("consulta") or "plan de busqueda")
+            + "\nPLAN YA PUBLICADO (decisiones calculadas y validadas en codigo):\n"
+            + json.dumps(estado["plan"], ensure_ascii=False)
+        )
+        usuario = armar_usuario(pedido, estado["fragmentos"], estado["herramientas"] or None)
+        respuesta = self.llm.completar(SISTEMA_BASE, usuario)
+        fuentes = self._extraer_fuentes(respuesta.texto, estado["fragmentos"], estado["herramientas"])
+        self.trazador.registrar(
+            "parte_narrativo",
+            modelo=respuesta.modelo,
+            cita_plan_previo=bool(estado.get("recuerdo")),
+            fuentes_citadas=fuentes,
+        )
+        return {"parte": respuesta.texto, "fuentes": fuentes}
+
+    def _nodo_memorizar(self, estado: EstadoPlan) -> dict:
+        sesion_id = estado.get("sesion_id")
+        if sesion_id:
+            self.memoria.registrar_turno(
+                sesion_id,
+                estado.get("consulta", ""),
+                resumen=estado["parte"][:200],
+                extra={
+                    "plan_version": estado["version"],
+                    "plan_archivo": estado["archivo"],
+                    "plan_resumen": _resumen_plan(estado["plan"]),
+                },
+            )
+            self.trazador.registrar(
+                "memoria", sesion_id=sesion_id, plan_version=estado["version"]
+            )
+        return {
+            "cito_plan_previo": bool(estado.get("recuerdo")),
+            "archivo_trace": str(self.trazador.archivo),
+        }
+
     @traceable("planificar")
     def planificar(
         self,
@@ -181,58 +260,18 @@ class AgenteRastreo(AgenteBase):
         sesion_id: str | None = None,
         consulta: str = "",
     ) -> dict:
-        """Calcula, valida y publica el plan; devuelve tambien el parte del LLM."""
-        self.trazador.registrar("planificacion", version=version, sesion_id=sesion_id)
-        fases, prioridad, motivo_auto, citas = self._construir_plan(version)
-        publicado = publicar_plan(
-            version, fases, prioridad, motivo_cambio or motivo_auto, citas,
-            dir_datos=self.dir_datos,
-        )
-        plan = {k: publicado[k] for k in ("version", "fases", "prioridad_zonas", "motivo_cambio", "citas")}
-        self.trazador.registrar(
-            "plan_publicado",
-            archivo=publicado["archivo"],
-            n_fases=len(fases),
-            prioridad=">".join(prioridad),
-            motivo=plan["motivo_cambio"] or "(version inicial)",
-        )
-
-        recuerdo_previo = self._recuerdo_plan_previo(sesion_id, version)
-        herramientas = ([recuerdo_previo] if recuerdo_previo else []) + self.verificaciones_extra(
-            consulta, [], sesion_id
-        )
-        fragmentos = self._buscar(consulta or "plan de busqueda por fases de una persona desaparecida")
-        pedido = (
-            (consulta or "plan de busqueda")
-            + "\nPLAN YA PUBLICADO (decisiones calculadas y validadas en codigo):\n"
-            + json.dumps(plan, ensure_ascii=False)
-        )
-        usuario = armar_usuario(pedido, fragmentos, herramientas or None)
-        respuesta = self.llm.completar(SISTEMA_BASE, usuario)
-        fuentes = self._extraer_fuentes(respuesta.texto, fragmentos, herramientas)
-        self.trazador.registrar(
-            "parte_narrativo",
-            modelo=respuesta.modelo,
-            cita_plan_previo=bool(recuerdo_previo),
-            fuentes_citadas=fuentes,
-        )
-        if sesion_id:
-            self.memoria.registrar_turno(
-                sesion_id,
-                consulta,
-                resumen=respuesta.texto[:200],
-                extra={
-                    "plan_version": version,
-                    "plan_archivo": publicado["archivo"],
-                    "plan_resumen": _resumen_plan(plan),
-                },
-            )
-            self.trazador.registrar("memoria", sesion_id=sesion_id, plan_version=version)
+        """Ejecuta el grafo: calcula, publica el plan y devuelve el parte del LLM."""
+        estado = self.grafo.invoke({
+            "version": version,
+            "motivo_cambio": motivo_cambio or "",
+            "sesion_id": sesion_id,
+            "consulta": consulta,
+        })
         return {
-            "plan": plan,
-            "archivo": publicado["archivo"],
-            "parte": respuesta.texto,
-            "fuentes_citadas": fuentes,
-            "cito_plan_previo": bool(recuerdo_previo),
-            "archivo_trace": str(self.trazador.archivo),
+            "plan": estado["plan"],
+            "archivo": estado["archivo"],
+            "parte": estado["parte"],
+            "fuentes_citadas": estado["fuentes"],
+            "cito_plan_previo": estado["cito_plan_previo"],
+            "archivo_trace": estado["archivo_trace"],
         }
