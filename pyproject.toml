@@ -1,7 +1,7 @@
 [project]
-name = "ep2-esqueleto"
+name = "ep2-rescate-agente"
 version = "0.1.0"
-description = "EP2 ISY0101 - Esqueleto compartido: motor de agente RAG con memoria y trazabilidad para los spikes SOC / rescate andino / observatorio"
+description = "EP2 ISY0101 - Agente coordinador de busqueda y rescate andino con RAG, memoria y trazabilidad"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [

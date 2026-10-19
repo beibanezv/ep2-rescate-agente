@@ -870,7 +870,7 @@ wheels = [
 ]
 
 [[package]]
-name = "ep2-esqueleto"
+name = "ep2-rescate-agente"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [

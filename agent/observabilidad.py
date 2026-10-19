@@ -3,7 +3,7 @@
 Activa con .env:
     LANGSMITH_TRACING=true
     LANGSMITH_API_KEY=lsv2_...
-    LANGSMITH_PROJECT=ep2-esqueleto
+    LANGSMITH_PROJECT=ep2-rescate-agente
 """
 import os
 from pathlib import Path
@@ -20,7 +20,7 @@ def init_langsmith() -> bool:
         return False
     os.environ["LANGCHAIN_TRACING_V2"] = os.getenv("LANGSMITH_TRACING", "true")
     os.environ["LANGCHAIN_PROJECT"] = os.getenv(
-        "LANGSMITH_PROJECT", "ep2-esqueleto"
+        "LANGSMITH_PROJECT", "ep2-rescate-agente"
     )
     return True
 
