@@ -13,7 +13,7 @@ pronóstico ficticios. No apto para operaciones reales.
 ```bash
 uv sync
 uv run python -m ingestion.ingest          # corpus -> Chroma (2/2 MATCH)
-uv run python -m pytest -q                 # 10 passed (motor 6 + dominio 4)
+uv run python -m pytest -q                 # 11 passed (motor 6 + dominio 5)
 
 # Acto 1 — clima bueno (reporte -> plan v1)
 uv run python main.py "excursionista desaparecida en El Morado; ultimo contacto 14:05 en el mirador" --plan --falso --sesion caso-morado --pasos
@@ -29,24 +29,34 @@ los actos desde cero: borra `data/planes/plan-*.json` (el repo conserva
 `plan-v1.json` como evidencia).
 
 Evidencia de corridas reales: `docs/salida-acto1.txt`, `docs/salida-acto2.txt`.
+Informe: `docs/informe-ep2.pdf` (4 págs) y `docs/informe-ep2.docx`.
 
 ## Arquitectura
 
 ```mermaid
 flowchart TB
     U[Operador: consulta + --plan] --> M[main.py CLI]
-    M --> A[AgenteRastreo AgenteBase]
-    A -->|1. memoria corto plazo| MEM[MemoriaAgente: buffer 20 turnos + Chroma]
-    A -->|2. RAG| R[Recuperador: Chroma conocimiento]
-    A -->|3. tools| T[tools/rastreo.py: leer_caso, zonas, clima, equipos, viabilidad_medio, publicar_plan]
-    A -->|4. LLM| L[Groq gpt-oss / ClienteFalso --falso]
-    A -->|5. escritura| P[data/planes/plan-vN.json]
-    A --> TR[Trazador: logs/trace.jsonl]
-    A --> O[LangSmith opcional]
+    M --> G[AgenteRastreo.planificar]
+    subgraph LG[Grafo LangGraph: agent/grafo.py]
+      C[contexto] --> CA[calcular] --> P[publicar] --> R[redactar] --> ME[memorizar]
+    end
+    G --> C
+    C -->|memoria corto plazo + RAG| MEM[MemoriaAgente: buffer 20 turnos + Chroma]
+    CA -->|tools| T[tools/rastreo.py: leer_caso, zonas, clima, equipos, viabilidad_medio]
+    P -->|valida y escribe| PL[data/planes/plan-vN.json]
+    R -->|redacta| L[Groq gpt-oss / ClienteFalso --falso]
+    ME -->|registra turno| MEM
+    G --> TR[Trazador: logs/trace.jsonl]
+    G --> O[LangSmith opcional]
 ```
 
 **Justificación de componentes:**
 
+- **Orquestación LangGraph.** `agent/grafo.py` declara `EstadoPlan` y compila
+  cinco nodos (`contexto → calcular → publicar → redactar → memorizar`);
+  `planificar()` invoca el grafo. Se prefirió a CrewAI porque el problema es un
+  pipeline con estado explícito y control determinista, no una conversación
+  entre roles.
 - **Código determinista decide, LLM redacta.** La prioridad de zonas (fórmula
   `probabilidad × facilidad / tiempo` del corpus), las fases y la viabilidad de
   cada medio se calculan en Python aplicando el protocolo; el LLM solo redacta
@@ -77,6 +87,8 @@ flowchart TB
 
 ## Estado
 
-- Tests: 10/10 (`uv run python -m pytest -q`).
-- Actos 1 y 2 verificados end-to-end con `--falso` (2026-10-18).
-- Pendiente: orquestación con framework, evals y evidencia con Groq real.
+- Tests: 11/11 (`uv run python -m pytest -q`).
+- LangGraph: 5 nodos en `agent/grafo.py`; el test del grafo cubre el flujo completo.
+- Actos 1 y 2 verificados end-to-end con `--falso` (2026-10-19); evidencia en `docs/`.
+- Informe EP2: `docs/informe-ep2.pdf` (4 págs) y `docs/informe-ep2.docx`.
+- Opcional: evidencia con Groq real (`.env` + `ClienteLangChain`) y evals del parte narrativo.
