@@ -12,6 +12,9 @@ corte del 18-10 y fue promovido a repo limpio.
   (LangGraph), `main.py --plan`, `tests/test_rastreo.py`.
 - **Consola visual:** `scripts/generar_consola.py` regenera
   `consola/consola.html` desde los datos reales de `data/` (idempotente).
+- **Interfaz Streamlit:** `app.py` (Centro de Operaciones) con Groq real por
+  defecto y toggle determinista explícito; reutiliza `AgenteRastreo.planificar`,
+  `scripts/reset_demo.py` y `scripts/aplicar_viento.py`.
 
 ## Estado (2026-10-19)
 
