@@ -813,6 +813,8 @@ planes = _planes(DIR_DATOS)
 plan_actual = st.session_state.get("plan_actual")
 if plan_actual is None:
     plan_actual = planes[-1] if planes else None
+    if plan_actual:
+        st.session_state["plan_actual"] = plan_actual
 plan_previo = st.session_state.get("plan_previo")
 if plan_previo is None and plan_actual and plan_actual.get("version", 1) > 1:
     plan_previo = next(

@@ -48,14 +48,30 @@ Abre `http://127.0.0.1:8501`. La interfaz usa **Groq real por defecto**. El
 toggle `Determinista` activa `ClienteFalso` y muestra el sello
 `DETERMINISTA · SIN GROQ`; no lo presentes como una corrida real.
 
-Secuencia de demo: **Reiniciar escenario → Publicar plan inicial → Aplicar
-viento → Replanificar**. La UI reutiliza `scripts/reset_demo.py`,
-`scripts/aplicar_viento.py` y `AgenteRastreo.planificar`; no duplica la lógica
-del agente ni cambia el plan calculado. Si falla la red o la cuota, usa el CLI
-con `--falso` como plan B y dilo explícitamente.
+Secuencia de demo: **Reiniciar escenario → Publicar plan inicial → Simulador
+what-if → Aplicar escenario → Replanificar**. La UI reutiliza
+`scripts/reset_demo.py`, `tools/escenario.py` y `AgenteRastreo.planificar`; no
+duplica la lógica del agente ni cambia el plan calculado. Si falla la red o la
+cuota, usa el CLI con `--falso` como plan B y dilo explícitamente.
 
-El botón **Consultar** responde dudas dentro del dominio con RAG, clima,
-equipos y el plan publicado (`plan-publicado`); no publica ni versiona un plan.
+El selector **Caso activo** cambia entre `morado`, `refugio` y `mirador`
+(`data/casos/<id>/`). Cada caso tiene su propia ficha, zonas, equipos y clima;
+la UI pasa ese directorio a `AgenteRastreo(dir_datos=...)`, así que el mismo
+motor calcula prioridades y fases sin duplicar código. Los planes se guardan
+en el `planes/` del caso activo.
+
+El **Simulador what-if** permite mover viento (20/35/41/50 km/h), visibilidad,
+HEL-1, K9-1 y DR-1. `preparar_escenario` copia el caso a un directorio temporal,
+aplica las condiciones y el agente replanifica sobre esa copia; los JSON del
+repo no se modifican. **Restaurar condiciones** vuelve al caso base.
+
+El botón **Consultar** mantiene un chat de sesión: responde dudas dentro del
+dominio con RAG, clima, equipos y el plan publicado (`plan-publicado`), y usa la
+memoria para follow-ups como "¿y si el viento baja a 30?". No publica ni
+versiona un plan. Cada fase del plan tiene **¿Por qué esta fase?** con zona,
+altitud, acceso, barrido, prioridad y restricciones de los medios. El badge de
+cada respuesta muestra modelo, latencia y número de herramientas.
+
 Si la consulta está fuera del operativo (por ejemplo, "¿cuál es la capital de
 Francia?"), responde con un rechazo explícito y ejemplos, sin gastar LLM ni
 crear archivos. Es la misma puerta de dominio que usa `planificar`.
@@ -106,6 +122,10 @@ flowchart TB
   `viabilidad_medio` (viento, visibilidad y luz) y las fases nocturnas no
   incluyen zonas técnicas. El LLM recibe el plan ya publicado y no puede
   modificarlo.
+- **Casos y what-if:** `data/casos/<id>/` mantiene fichas y condiciones
+  separadas; `tools/escenario.py` copia el caso a un temporal y aplica viento,
+  visibilidad y disponibilidad de medios. El motor recibe `dir_datos` y no
+  distingue entre caso base y escenario.
 
 ## Qué demuestra (actos)
 
@@ -120,7 +140,7 @@ flowchart TB
 
 ## Estado
 
-- Tests: 19/19 (`uv run python -m pytest -q`); incluye recuperación semántica en `contexto`, citas con espacios y la puerta de dominio del modo consulta.
+- Tests: 27/27 (`uv run python -m pytest -q`); incluye recuperación semántica en `contexto`, citas con espacios, puerta de dominio del modo consulta, casos intercambiables y simulador what-if.
 - LangGraph: 5 nodos en `agent/grafo.py`; el test del grafo cubre el flujo completo.
 - Actos 1 y 2 verificados end-to-end el 2026-10-19 con Groq real
   (`openai/gpt-oss-120b`); evidencia en `docs/`.
