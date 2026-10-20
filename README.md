@@ -1,6 +1,6 @@
 # ep2-rescate-agente — EP2 ISY0101
 
-Agente conversacional con tools que convierte el reporte de una persona
+Agente con tools que convierte el reporte de una persona
 desaparecida en un **plan de búsqueda por fases** y lo **replanifica en vivo**
 cuando el clima invalida la ventana de un medio (el viento cierra el
 helicóptero, el dron solo vuela donde el pronóstico lo permite).
@@ -10,25 +10,32 @@ pronóstico ficticios. No apto para operaciones reales.
 
 ## Cómo correr
 
-```bash
+```powershell
 uv sync
 uv run python -m ingestion.ingest          # corpus -> Chroma (2/2 MATCH)
-uv run python -m pytest -q                 # 11 passed (motor 6 + dominio 5)
+uv run python -m pytest -q                 # 14 passed (motor 8 + dominio 6)
 
-# Acto 1 — clima bueno (reporte -> plan v1)
-uv run python main.py "excursionista desaparecida en El Morado; ultimo contacto 14:05 en el mirador" --plan --falso --sesion caso-morado --pasos
+# Deja el estado limpio: borra planes/trazas/memoria y restaura clima-base.json
+uv run python scripts/reset_demo.py
 
-# Acto 2 — el operador reemplaza las franjas 06:00-12:00 de data/clima.json por
-# la tabla de viento del brief (§6, 38-55 km/h) y replanifica:
-uv run python main.py "replanifica el operativo por el viento" --plan --falso --sesion caso-morado --pasos
-cat data/planes/plan-v2.json
+# Acto 1 — clima bueno (reporte -> plan v1). Sin --falso usa Groq real.
+uv run python main.py "excursionista desaparecida en El Morado; ultimo contacto 14:05 en el mirador" --plan --sesion caso-morado --pasos
+
+# Acto 2 — aplica el evento de viento del brief (38-55 km/h) y replanifica:
+uv run python scripts/aplicar_viento.py
+uv run python main.py "replanifica el operativo por el viento" --plan --sesion caso-morado --pasos
+Get-Content data/planes/plan-v2.json
 ```
 
-El CLI publica la siguiente versión libre (`plan-v<N>.json`). Para reproducir
-los actos desde cero: borra `data/planes/plan-*.json` (el repo conserva
-`plan-v1.json` como evidencia).
+`main.py` usa `ClienteLangChain` (Groq `openai/gpt-oss-120b`) por defecto;
+`--falso` activa el cliente determinista para trabajar sin red o sin cuota.
+El CLI publica la siguiente versión libre (`plan-v<N>.json`). Para repetir los
+actos desde cero, ejecuta `reset_demo.py` antes del acto 1; el reset también
+restaura `data/clima.json` desde `data/clima-base.json`. `data/planes/plan-v1.json`
+se conserva versionado como evidencia del acto 1.
 
-Evidencia de corridas reales: `docs/salida-acto1.txt`, `docs/salida-acto2.txt`.
+Evidencia: `docs/salida-acto1.txt`, `docs/salida-acto2.txt` y
+`docs/plan-v2-evidencia.json` (plan v2 generado por el acto 2).
 Informe: `docs/informe-ep2.pdf` (4 págs) y `docs/informe-ep2.docx`.
 
 ## Arquitectura
@@ -62,17 +69,21 @@ flowchart TB
   cada medio se calculan en Python aplicando el protocolo; el LLM solo redacta
   el parte narrativo. Por eso el agente es demostrable sin red (`--falso`) y
   reproducible.
-- **Memoria de corto plazo:** buffer JSON de 20 turnos + colección Chroma
-  `memoria`; en la replanificación el parte cita el plan v1 previo de la sesión
-  (`memoria:caso-morado`).
-- **RAG:** colección Chroma `conocimiento` con protocolo y criterios; cada
-  decisión cita `[F#]` (fragmentos de corpus) y `[T#]` (hechos de tools).
+- **Memoria:** buffer JSON de 20 turnos + colección Chroma `memoria`. El nodo
+  `contexto` recupera el plan v1 del buffer y hace `memoria.recuperar` por
+  sesión; en el acto 2 las fuentes incluyen `memoria-semantica:caso-morado` y
+  `memoria:caso-morado`.
+- **RAG:** colección Chroma `conocimiento` con protocolo y criterios; el parte
+  narrativo cita `[F#]` (fragmentos de corpus) y `[T#]` (hechos de tools); el
+  JSON del plan guarda citas legibles para auditoría.
 - **Tools de lectura** (`leer_caso`, `detalle_zonas`, `pronostico`,
   `equipos_disponibles`, `viabilidad_medio`) y **de escritura**
-  (`publicar_plan`: valida franja ISO, zonas y medios contra los JSON antes de
-  escribir `data/planes/plan-v<N>.json`).
-- **Guardrail central:** ningún medio se asigna fuera de su ventana (viento,
-  visibilidad, luz, autonomía); no se ingresa a zonas técnicas de noche.
+  (`publicar_plan`: valida versión, fases, franja ISO, zonas y medios contra los
+  JSON antes de escribir `data/planes/plan-v<N>.json`; no calcula viabilidad).
+- **Guardrail central:** la viabilidad de un medio aéreo se calcula antes con
+  `viabilidad_medio` (viento, visibilidad y luz) y las fases nocturnas no
+  incluyen zonas técnicas. El LLM recibe el plan ya publicado y no puede
+  modificarlo.
 
 ## Qué demuestra (actos)
 
@@ -87,8 +98,9 @@ flowchart TB
 
 ## Estado
 
-- Tests: 11/11 (`uv run python -m pytest -q`).
+- Tests: 14/14 (`uv run python -m pytest -q`); incluye recuperación semántica en `contexto` y citas con espacios.
 - LangGraph: 5 nodos en `agent/grafo.py`; el test del grafo cubre el flujo completo.
-- Actos 1 y 2 verificados end-to-end con `--falso` (2026-10-19); evidencia en `docs/`.
+- Actos 1 y 2 verificados end-to-end el 2026-10-19 con Groq real
+  (`openai/gpt-oss-120b`); evidencia en `docs/`.
 - Informe EP2: `docs/informe-ep2.pdf` (4 págs) y `docs/informe-ep2.docx`.
-- Opcional: evidencia con Groq real (`.env` + `ClienteLangChain`) y evals del parte narrativo.
+- `--falso` reproduce el mismo plan sin red ni cuota.

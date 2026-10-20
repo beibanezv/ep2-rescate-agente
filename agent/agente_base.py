@@ -20,7 +20,7 @@ from agent.prompts import SISTEMA_BASE, armar_usuario
 from agent.retriever import Fragmento, Recuperador
 from agent.trace import Trazador
 
-REGEX_CITAS = re.compile(r"\[(F|T)(\d+)\]")
+REGEX_CITAS = re.compile(r"\[\s*(F|T)\s*(\d+)\s*\]")
 
 # Puerta fuera de dominio: distancia del top-1 (menor = mas similar).
 # Calibrado 2026-10-15 con el corpus demo del esqueleto: consultas validas

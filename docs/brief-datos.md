@@ -1,5 +1,9 @@
 # Brief de datos — Spike rescate andino (coordinador de operaciones)
 
+> Documento histórico del spike original. El entregable evolucionó (LangGraph,
+> informe, 14 tests y evidencia real); la fuente vigente es `README.md` y
+> `agents.md`. Se conserva como registro de diseño del dominio.
+
 > Spike desechable de la EP2. **Definición de HECHO** (sábado 18-10 noche):
 > el momento cumbre de este documento corre end-to-end con `--falso` + el test
 > dorado en verde + README actualizado con la salida real.

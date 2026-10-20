@@ -1,0 +1,63 @@
+{
+  "version": 2,
+  "fases": [
+    {
+      "franja": "2026-10-17T23:00/2026-10-18T05:00",
+      "zona": "Z-2",
+      "medios": [
+        "EQ-2",
+        "K9-1"
+      ],
+      "objetivo": "Anclaje nocturno en Mirador de la cascada (senderos y caminos)"
+    },
+    {
+      "franja": "2026-10-17T23:00/2026-10-18T05:00",
+      "zona": "Z-5",
+      "medios": [
+        "EQ-2",
+        "K9-1"
+      ],
+      "objetivo": "Anclaje nocturno en Camino de servicio al embalse (senderos y caminos)"
+    },
+    {
+      "franja": "2026-10-18T06:00/2026-10-18T12:00",
+      "zona": "Z-2",
+      "medios": [
+        "EQ-1"
+      ],
+      "objetivo": "Barrido diurno de Mirador de la cascada y variantes"
+    },
+    {
+      "franja": "2026-10-18T06:00/2026-10-18T12:00",
+      "zona": "Z-5",
+      "medios": [
+        "DR-1"
+      ],
+      "objetivo": "Barrido diurno de Camino de servicio al embalse y variantes"
+    },
+    {
+      "franja": "2026-10-18T06:00/2026-10-18T12:00",
+      "zona": "Z-1",
+      "medios": [
+        "EQ-1"
+      ],
+      "objetivo": "Barrido diurno de Refugio El Morado y sendero alto y variantes"
+    }
+  ],
+  "prioridad_zonas": [
+    "Z-2",
+    "Z-5",
+    "Z-1",
+    "Z-4",
+    "Z-3"
+  ],
+  "motivo_cambio": "Replanificacion por cambio de pronostico: HEL-1 no opera en Z-2 de 06:00 a 12:00: viento 41 km/h >= 35 km/h (protocolo-busqueda 3: helicoptero solo con viento < 35 km/h y visibilidad > 5 km, de dia); DR-1 no opera en Z-2 de 06:00 a 12:00: viento 41 km/h > 40 km/h (protocolo-busqueda 3: dron con viento maximo 40 km/h, solo con luz diurna); HEL-1 no opera en Z-5 de 06:00 a 12:00: viento 38 km/h >= 35 km/h (protocolo-busqueda 3: helicoptero solo con viento < 35 km/h y visibilidad > 5 km, de dia). Se propone reevaluar HEL-1 en 12:00-18:00: Z-2 24 km/h, Z-5 22 km/h, Z-1 26 km/h (bajo 35 km/h)",
+  "citas": [
+    "protocolo-busqueda 2: fase I nocturna no ingresa a zonas tecnicas ni altas y cierra antes del amanecer",
+    "protocolo-busqueda 3: helicoptero viento < 35 km/h y visibilidad > 5 km, solo de dia",
+    "protocolo-busqueda 3: dron viento maximo 40 km/h, solo con luz diurna",
+    "protocolo-busqueda 3: brigadas y K9 no ingresan a zonas altas (Z-3/Z-4) sin aclimatacion",
+    "criterios-prioridad: ultimo contacto primero; ruta declarada y variantes despues; tecnicas al final",
+    "protocolo-busqueda 4: si un medio pierde su ventana (clima, luz, autonomia), el replanificado es obligatorio antes de continuar"
+  ]
+}

@@ -1,11 +1,11 @@
-"""CLI del esqueleto: consulta -> respuesta citada con trazabilidad.
+"""CLI del coordinador de rescate: consulta y plan por fases con trazabilidad.
 
 Uso:
-    python main.py "que regla aplica al registrar una decision" --falso --pasos
-    python main.py "que especialidad tiene la cuadrilla A" --falso --sesion demo1
-    python main.py "consulta" --falso --salida      # demuestra la tool de escritura
+    python main.py "reporte del caso" --plan --sesion caso-morado
+        # publica data/planes/plan-v<N>.json y redacta el parte
     python main.py "reporte del caso" --plan --falso --sesion caso-morado
-        # planificacion de rescate: publica data/planes/plan-v<N>.json
+        # mismo flujo con ClienteFalso, sin red ni cuota
+    python main.py "que dice el protocolo" --falso --pasos
 
 Con --falso usa ClienteFalso (determinista, sin cuota Groq); por defecto usa
 ClienteLangChain (ChatGroq via LangChain, openai/gpt-oss-120b) con tracing

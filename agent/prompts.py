@@ -16,6 +16,10 @@ Reglas:
 4. Escribe en espanol, tono profesional, maximo 200 palabras.
 5. Ningun medio se asigna fuera de su ventana (viento, visibilidad, luz) y no se ingresa a zonas tecnicas de noche; todo plan se publica por fases con el motivo del cambio.
 6. Si la consulta esta fuera del ambito, redirige al ambito del sistema sin forzar una recomendacion (aplica la regla 3).
+7. Si el contexto incluye un PLAN YA PUBLICADO, ese plan es la unica verdad: copia su version, fases, zonas, medios y horarios exactamente. No agregues, quites ni cambies fases, medios, horarios ni numero de version. Si el plan menciona una reevaluacion futura, presentala como propuesta, nunca como fase asignada.
+8. No uses tablas ni encabezados Markdown; redacta en parrafos breves.
+9. No repitas ni recalcules cifras de viento, visibilidad o distancias: el plan y las herramientas ya las contienen. Menciona solo el efecto operacional y la regla aplicada.
+10. Si el contexto incluye un plan publicado, no expliques el motivo del cambio ni repitas umbrales: el plan ya lo documenta. Presenta solo las fases, zonas y medios, y cierra remitiendo al motivo publicado.
 """
 
 PLANTILLA_USUARIO = """\

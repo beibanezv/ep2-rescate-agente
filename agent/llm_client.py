@@ -94,6 +94,14 @@ class ClienteLangChain(ClienteLLM):
             init_langsmith()
         except ImportError:
             pass
-        chat = ChatGroq(model=self.modelo, temperature=0.2, max_tokens=1024)
+        # gpt-oss gasta tokens de razonamiento dentro de max_tokens; con 1024 el
+        # parte podia volver vacio. reasoning_effort=low deja espacio a la respuesta.
+        # temperature 0: el parte transcribe un plan ya validado, no improvisa.
+        chat = ChatGroq(
+            model=self.modelo,
+            temperature=0.0,
+            max_tokens=4096,
+            reasoning_effort="low",
+        )
         r = chat.invoke([SystemMessage(content=sistema), HumanMessage(content=usuario)])
         return RespuestaLLM(texto=str(r.content).strip(), modelo=self.modelo)

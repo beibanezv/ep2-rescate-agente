@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 
 from agent.llm_client import ClienteFalso
-from agent.memoria import MemoriaAgente
+from agent.memoria import MemoriaAgente, Recuerdo
 from agent.rastreo import AgenteRastreo
 from agent.retriever import Fragmento
 from agent.trace import Trazador
@@ -138,6 +138,22 @@ def test_grafo_ejecuta_planificacion_completa(tmp_path, monkeypatch):
     assert Path(estado["archivo"]).name == "plan-v1.json"
     assert estado["parte"]
     assert estado["cito_plan_previo"] is False
+
+
+def test_contexto_recupera_memoria_semantica(tmp_path, monkeypatch):
+    agente = _agente(tmp_path, _datos(tmp_path), monkeypatch)
+    llamadas = {}
+
+    def recuperar_falso(consulta, sesion_id="", k=2):
+        llamadas["sesion_id"] = sesion_id
+        return [Recuerdo(texto="turno previo de la sesion", fuente="memoria-semantica:caso-morado")]
+
+    monkeypatch.setattr(agente.memoria, "recuperar", recuperar_falso)
+    estado = agente._nodo_contexto(
+        {"version": 2, "sesion_id": "caso-morado", "consulta": "replanifica por viento"}
+    )
+    assert llamadas["sesion_id"] == "caso-morado"
+    assert ("memoria-semantica:caso-morado", "turno previo de la sesion") in estado["herramientas"]
 
 
 def test_publicar_plan_valida_estructura(tmp_path):

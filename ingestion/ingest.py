@@ -118,5 +118,5 @@ def verificar() -> bool:
 if __name__ == "__main__":
     load_dotenv()
     chunks, total = construir_indice()
-    print(f"Ingesta OK: {chunks} documentos indexados (total en coleccion: {total})")
+    print(f"Ingesta OK: {chunks} fragmentos indexados (total en coleccion: {total})")
     raise SystemExit(0 if verificar() else 1)

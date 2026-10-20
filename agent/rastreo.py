@@ -182,7 +182,16 @@ class AgenteRastreo(AgenteBase):
         consulta = estado.get("consulta", "")
         self.trazador.registrar("planificacion", version=version, sesion_id=sesion_id)
         recuerdo = self._recuerdo_plan_previo(sesion_id, version)
-        herramientas = ([recuerdo] if recuerdo else []) + self.verificaciones_extra(
+        semanticos = []
+        if sesion_id:
+            semanticos = self.memoria.recuperar(consulta, sesion_id)
+            self.trazador.registrar(
+                "memoria_semantica", sesion_id=sesion_id, recuerdos=len(semanticos)
+            )
+        herramientas = [
+            (f"memoria-semantica:{sesion_id}", r.texto) for r in semanticos
+        ]
+        herramientas += ([recuerdo] if recuerdo else []) + self.verificaciones_extra(
             consulta, [], sesion_id
         )
         fragmentos = self._buscar(consulta or "plan de busqueda por fases de una persona desaparecida")

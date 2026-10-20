@@ -85,3 +85,33 @@ def test_tool_escritura_valida_y_persiste(tmp_path):
     r = registrar_salida("ok", "prueba", {"a": 1}, dir_salidas=tmp_path)
     assert (tmp_path / "ok.json").exists()
     assert r["tipo"] == "prueba"
+
+def test_cliente_langchain_reserva_tokens_y_baja_razonamiento(monkeypatch):
+    import langchain_groq
+    from agent.llm_client import ClienteLangChain
+
+    capturado = {}
+
+    class ChatFalso:
+        def __init__(self, **kwargs):
+            capturado.update(kwargs)
+
+        def invoke(self, mensajes):
+            return type("Respuesta", (), {"content": "parte narrativo"})()
+
+    monkeypatch.setattr(langchain_groq, "ChatGroq", ChatFalso)
+    r = ClienteLangChain().completar("sistema", "usuario")
+    assert r.texto == "parte narrativo"
+    assert capturado["reasoning_effort"] == "low"
+    assert capturado["max_tokens"] >= 2048
+
+
+def test_extrae_citas_aunque_el_modelo_deje_espacios():
+    from agent.agente_base import AgenteBase
+    from agent.retriever import Fragmento
+
+    fragmentos = [Fragmento(id="f1", texto="protocolo", fuente="protocolo-busqueda", tipo="protocolo")]
+    fuentes = AgenteBase._extraer_fuentes(
+        None, "aplica la regla [ F1 ] y el dato [ T1 ].", fragmentos, [("clima", "viento")]
+    )
+    assert fuentes == ["protocolo-busqueda", "clima"]
