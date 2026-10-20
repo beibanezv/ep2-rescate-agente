@@ -9,8 +9,10 @@ import html
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 import streamlit as st
@@ -23,6 +25,7 @@ from agent.llm_client import ClienteFalso, ClienteLangChain
 from agent.observabilidad import init_langsmith
 from agent.rastreo import AgenteRastreo
 from agent.trace import Trazador
+from tools.escenario import preparar_escenario
 
 init_langsmith()
 
@@ -38,14 +41,23 @@ CONSULTA_DEFECTO = (
 SESION_DEFECTO = "caso-morado"
 
 CASOS = {
-    "morado": {"nombre": "El Morado · M. Torres", "dir": RAIZ / "data"},
+    "morado": {
+        "nombre": "El Morado · M. Torres",
+        "dir": RAIZ / "data",
+        "consulta": CONSULTA_DEFECTO,
+        "sesion": SESION_DEFECTO,
+    },
     "refugio": {
         "nombre": "Refugio · L. Fuentes",
         "dir": RAIZ / "data" / "casos" / "refugio",
+        "consulta": "excursionista desaparecida en el Refugio El Morado; ultimo contacto 16:20 en el refugio",
+        "sesion": "caso-refugio",
     },
     "mirador": {
         "nombre": "Mirador · J. Silva",
         "dir": RAIZ / "data" / "casos" / "mirador",
+        "consulta": "excursionista desaparecida en el mirador de la cascada; ultimo contacto 15:10",
+        "sesion": "caso-mirador",
     },
 }
 
@@ -73,11 +85,20 @@ def _limpiar_estado() -> None:
         "viento",
         "modo",
         "modelo",
+        "escenario",
     ):
         st.session_state.pop(clave, None)
+    escenario = st.session_state.pop("dir_escenario", None)
+    if escenario:
+        shutil.rmtree(escenario, ignore_errors=True)
+    caso = CASOS[st.session_state.get("caso_activo", "morado")]
+    st.session_state["consulta"] = caso["consulta"]
+    st.session_state["sesion"] = caso["sesion"]
 
 
-DIR_DATOS = CASOS[st.session_state.get("caso_activo", "morado")]["dir"]
+CASO_ACTIVO = st.session_state.get("caso_activo", "morado")
+DIR_BASE = CASOS[CASO_ACTIVO]["dir"]
+DIR_DATOS = Path(st.session_state.get("dir_escenario") or DIR_BASE)
 FICHA = _leer_json(DIR_DATOS / "ficha-persona.json", {})
 ZONAS = {
     z["id"]: z
@@ -445,31 +466,58 @@ def _trazador_actual() -> Trazador:
 
 
 def _reset() -> None:
-    resultado = _ejecutar_script("reset_demo.py", ["--dir-datos", str(DIR_DATOS)])
+    resultado = _ejecutar_script("reset_demo.py", ["--dir-datos", str(DIR_BASE)])
     if resultado.returncode != 0:
         st.error(f"No se pudo reiniciar: {resultado.stderr.strip()}")
         return
-    for clave in (
-        "resultado",
-        "trace",
-        "plan_actual",
-        "plan_previo",
-        "plan_archivo",
-        "viento",
-        "modo",
-        "modelo",
-        "consulta_resultado",
-    ):
-        st.session_state.pop(clave, None)
+    _limpiar_estado()
     st.rerun()
 
 
-def _aplicar_viento() -> None:
-    resultado = _ejecutar_script("aplicar_viento.py")
-    if resultado.returncode != 0:
-        st.error(f"No se pudo aplicar el viento: {resultado.stderr.strip()}")
+def _aplicar_escenario(
+    viento_kmh: int,
+    visibilidad: str,
+    hel_disponible: bool,
+    k9_disponible: bool,
+    dron_operable: bool,
+) -> None:
+    condiciones = {
+        "viento_kmh": viento_kmh,
+        "visibilidad": visibilidad,
+        "hel_disponible": hel_disponible,
+        "k9_disponible": k9_disponible,
+        "dron_operable": dron_operable,
+    }
+    plan = st.session_state.get("plan_actual")
+    conservar_v1 = bool(plan and plan.get("version") == 1)
+    anterior = st.session_state.pop("dir_escenario", None)
+    if anterior:
+        shutil.rmtree(anterior, ignore_errors=True)
+    destino = Path(tempfile.mkdtemp(prefix=f"rescate-{CASO_ACTIVO}-"))
+    try:
+        preparar_escenario(
+            DIR_BASE,
+            destino,
+            condiciones,
+            copiar_planes=conservar_v1,
+        )
+    except Exception as exc:
+        st.error(f"No se pudo preparar el escenario: {exc}")
         return
-    st.session_state["viento"] = True
+    st.session_state["dir_escenario"] = str(destino)
+    st.session_state["escenario"] = condiciones
+    st.session_state.pop("resultado", None)
+    st.session_state.pop("trace", None)
+    st.session_state.pop("consulta_resultado", None)
+    if not conservar_v1:
+        st.session_state.pop("plan_actual", None)
+        st.session_state.pop("plan_previo", None)
+        st.session_state.pop("plan_archivo", None)
+    st.rerun()
+
+
+def _restaurar_condiciones() -> None:
+    _limpiar_estado()
     st.rerun()
 
 
@@ -750,7 +798,7 @@ st.session_state.setdefault("sesion", SESION_DEFECTO)
 
 header_slot = st.empty()
 
-st.markdown('<p class="hint">Secuencia de la demostración: Reiniciar → Publicar plan inicial → Aplicar viento → Replanificar.</p>', unsafe_allow_html=True)
+st.markdown('<p class="hint">Secuencia: Reiniciar → Publicar plan inicial → Simulador what-if → Aplicar escenario → Replanificar.</p>', unsafe_allow_html=True)
 
 fila_inputs = st.columns([2.6, 1.25, 1.05])
 with fila_inputs[0]:
@@ -768,7 +816,31 @@ with fila_inputs[2]:
 
 header_slot.markdown(_header_html(plan_actual, franjas, fake), unsafe_allow_html=True)
 
-acciones = st.columns([1.15, 1, 1, 1, 1])
+escenario = st.session_state.get("escenario", {})
+with st.expander("Simulador what-if · clima y medios", expanded=False):
+    controles = st.columns([1.2, 1, 1, 1, 1])
+    viento_sel = controles[0].select_slider(
+        "Viento 06–12 (km/h)", options=[20, 35, 41, 50], value=escenario.get("viento_kmh", 20)
+    )
+    visibilidad_sel = controles[1].selectbox(
+        "Visibilidad",
+        ["buena", "regular", "mala"],
+        index=["buena", "regular", "mala"].index(escenario.get("visibilidad", "buena")),
+    )
+    hel_sel = controles[2].toggle("HEL-1 disponible", value=escenario.get("hel_disponible", True))
+    k9_sel = controles[3].toggle("K9-1 disponible", value=escenario.get("k9_disponible", True))
+    dron_sel = controles[4].toggle("DR-1 operable", value=escenario.get("dron_operable", True))
+    botones_escenario = st.columns(2)
+    boton_escenario = botones_escenario[0].button(
+        "Aplicar escenario",
+        use_container_width=True,
+        help="Copia el caso a un directorio temporal; no modifica los JSON base.",
+    )
+    boton_restaurar = botones_escenario[1].button(
+        "Restaurar condiciones", use_container_width=True
+    )
+
+acciones = st.columns([1.15, 1, 1, 1])
 with acciones[0]:
     boton_plan = st.button(
         "Publicar plan inicial",
@@ -783,28 +855,28 @@ with acciones[1]:
         help="Responde una duda con RAG, clima, equipos y el plan publicado. No publica un plan.",
     )
 with acciones[2]:
-    boton_viento = st.button(
-        "Aplicar viento",
-        use_container_width=True,
-        disabled=plan_actual is None or viento or plan_actual.get("version", 1) >= 2,
-    )
-with acciones[3]:
     boton_replan = st.button(
         "Replanificar",
         use_container_width=True,
-        disabled=not (plan_actual and plan_actual.get("version", 1) == 1 and viento),
+        disabled=not (
+            plan_actual
+            and plan_actual.get("version", 1) == 1
+            and (viento or st.session_state.get("dir_escenario"))
+        ),
     )
-with acciones[4]:
+with acciones[3]:
     boton_reset = st.button("Reiniciar escenario", use_container_width=True)
 
+if boton_restaurar:
+    _restaurar_condiciones()
+if boton_escenario:
+    _aplicar_escenario(viento_sel, visibilidad_sel, hel_sel, k9_sel, dron_sel)
 if boton_reset:
     _reset()
 if boton_plan:
     _publicar(1, consulta, sesion, fake)
 if boton_consulta:
     _consultar(consulta or CONSULTA_DEFECTO, sesion, fake)
-if boton_viento:
-    _aplicar_viento()
 if boton_replan:
     _publicar(2, "replanifica el operativo por el viento", sesion, fake)
 

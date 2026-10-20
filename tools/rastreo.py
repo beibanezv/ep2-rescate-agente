@@ -99,6 +99,8 @@ def viabilidad_medio(
     inicio, fin = datetime.fromisoformat(f["desde"]), datetime.fromisoformat(f["hasta"])
     equipo, z = equipos[medio], zonas[zona]
     motivos: list[str] = []
+    if equipo.get("disponible") is False:
+        motivos.append("fuera de servicio por decision del operativo")
     # shortcut: la autonomia no se checa; las franjas usadas caben en las autonomias
     # declaradas (EQ-2 6 h = franja nocturna, K9 4 h dentro de ella). Revisar si un
     # plan nuevo usa franjas mas largas que la autonomia del medio.

@@ -174,16 +174,29 @@ class AgenteRastreo(AgenteBase):
         probables = [zid for zid in prioridad if zid not in tecnicas]
 
         fases: list[dict] = []
+        descartes: list[str] = []
         # Fase I: anclaje nocturno en las 2 zonas probables mas faciles (senderos/caminos).
         for zid in probables[:2]:
-            fases.append({
-                "franja": FRANJA_NOCTURNA,
-                "zona": zid,
-                "medios": ["EQ-2", "K9-1"],
-                "objetivo": f"Anclaje nocturno en {zonas[zid]['nombre']} (senderos y caminos)",
-            })
+            medios_noche = []
+            base = next(f for f in pronostico(zid, self.dir_datos) if f["desde"].endswith("22:00"))
+            franja = {**base, "desde": FRANJA_NOCTURNA.split("/")[0], "hasta": FRANJA_NOCTURNA.split("/")[1]}
+            for medio in ("EQ-2", "K9-1"):
+                v = viabilidad_medio(medio, zid, franja, self.dir_datos)
+                if v["puede"]:
+                    medios_noche.append(medio)
+                else:
+                    descartes.append(
+                        f"{medio} no opera en {zid} de 22:00 a 06:00: "
+                        f"{'; '.join(v['motivos'])} ({v['regla']})"
+                    )
+            if medios_noche:
+                fases.append({
+                    "franja": FRANJA_NOCTURNA,
+                    "zona": zid,
+                    "medios": medios_noche,
+                    "objetivo": f"Anclaje nocturno en {zonas[zid]['nombre']} (senderos y caminos)",
+                })
 
-        descartes: list[str] = []
         ruta = ficha.get("ruta_declarada", "")
         for i, zid in enumerate(probables):
             medios: list[str] = []
