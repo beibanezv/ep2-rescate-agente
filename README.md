@@ -38,6 +38,22 @@ Evidencia: `docs/salida-acto1.txt`, `docs/salida-acto2.txt` y
 `docs/plan-v2-evidencia.json` (plan v2 generado por el acto 2).
 Informe: `docs/informe-ep2.pdf` (4 págs) y `docs/informe-ep2.docx`.
 
+## Interfaz Streamlit (demo EP2)
+
+```powershell
+uv run streamlit run app.py --server.port 8501 --server.address 127.0.0.1
+```
+
+Abre `http://127.0.0.1:8501`. La interfaz usa **Groq real por defecto**. El
+toggle `Determinista` activa `ClienteFalso` y muestra el sello
+`DETERMINISTA · SIN GROQ`; no lo presentes como una corrida real.
+
+Secuencia de demo: **Reiniciar escenario → Publicar plan inicial → Aplicar
+viento → Replanificar**. La UI reutiliza `scripts/reset_demo.py`,
+`scripts/aplicar_viento.py` y `AgenteRastreo.planificar`; no duplica la lógica
+del agente ni cambia el plan calculado. Si falla la red o la cuota, usa el CLI
+con `--falso` como plan B y dilo explícitamente.
+
 ## Arquitectura
 
 ```mermaid
