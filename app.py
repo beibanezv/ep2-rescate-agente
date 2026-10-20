@@ -494,7 +494,6 @@ def _reset() -> None:
         st.error(f"No se pudo reiniciar: {resultado.stderr.strip()}")
         return
     _limpiar_estado()
-    st.rerun()
 
 
 def _aplicar_escenario(
@@ -901,14 +900,12 @@ with acciones[2]:
         ),
     )
 with acciones[3]:
-    boton_reset = st.button("Reiniciar escenario", use_container_width=True)
+    st.button("Reiniciar escenario", use_container_width=True, on_click=_reset)
 
 if boton_restaurar:
     _restaurar_condiciones()
 if boton_escenario:
     _aplicar_escenario(viento_sel, visibilidad_sel, hel_sel, k9_sel, dron_sel)
-if boton_reset:
-    _reset()
 if boton_plan:
     _publicar(1, consulta, sesion, fake)
 if boton_consulta:
