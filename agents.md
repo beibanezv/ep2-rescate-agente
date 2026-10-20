@@ -23,8 +23,13 @@ corte del 18-10 y fue promovido a repo limpio.
 - Memoria: el nodo `contexto` recupera el plan previo del buffer y llama a
   `memoria.recuperar(consulta, sesion_id)`; traza `memoria_semantica` y agrega
   `memoria-semantica:<sesion>` a las fuentes.
-- Tests 14/14 (motor 8 + dominio 6; incluye flujo completo del grafo,
-  recuperación semántica en contexto y citas `[ F1 ]` con espacios).
+- Tests 19/19 (motor 8 + dominio 6 + consulta 5; incluye flujo completo del
+  grafo, recuperación semántica en contexto, citas `[ F1 ]` con espacios y
+  rechazo fuera de dominio sin publicar plan).
+- Consulta libre: `AgenteRastreo.consultar(consulta, sesion_id)` usa `procesar()`
+  con RAG + clima/equipos + `plan-publicado` como tool; no publica plan.
+  `planificar()` aplica una puerta híbrida (claves de dominio + score > 0.70)
+  y rechaza fuera de dominio sin publicar.
 - Actos 1 y 2 regenerados en este repo con Groq real (`openai/gpt-oss-120b`):
   plan v1 con HEL-1+DR-1 en 06:00-12:00; acto 2 con viento 41/38 km/h →
   HEL-1 fuera, DR-1 solo en Z-5, motivo con regla citada, memoria semántica y

@@ -9,6 +9,8 @@ parte narrativo. Extiende `AgenteBase`:
   plan -> memoria de sesion -> parte. En v>1 cita el plan previo de la sesion.
 """
 import json
+import re
+import unicodedata
 from pathlib import Path
 
 from agent.agente_base import AgenteBase
@@ -42,6 +44,41 @@ CITA_REPLANIFICADO = (
     "el replanificado es obligatorio antes de continuar"
 )
 
+TEXTO_FUERA_DE_DOMINIO_RESCATE = (
+    "Solo puedo ayudar con el operativo de busqueda y rescate del caso El Morado "
+    "(zonas, equipos, clima, protocolo y plan). No puedo responder consultas fuera "
+    "de ese alcance. Prueba con: '¿Que equipos hay disponibles?', "
+    "'¿Que zonas son tecnicas?', '¿Por que se descarto HEL-1?'."
+)
+
+# El corpus es pequeno y los scores no separan solos: una consulta valida puede
+# quedar en 0.85 y una ajena en 0.72. Por eso manda la clave de dominio.
+CLAVES_RESCATE = (
+    "rescate", "busqueda", "operativo", "plan", "fase", "zona", "equipo", "medio",
+    "clima", "pronostico", "viento", "visibilidad", "helo", "helicoptero", "dron",
+    "protocolo", "prioridad", "tecnica", "altitud", "sendero", "ruta", "perro",
+    "guia", "persona", "desaparecida", "excursionista", "morado", "ficha",
+    "ultimo contacto", "noche", "nocturno", "barrido", "replanifica", "asignar",
+    "buscar", "m torres", "dr 1", "hel 1", "eq 1", "k9", "que paso", "llover",
+    "lluvia", "nieve", "vivo", "viva", "herido", "herida", "salud",
+)
+
+
+def _normalizar(texto: str) -> str:
+    sin_tildes = "".join(
+        c for c in unicodedata.normalize("NFKD", texto)
+        if not unicodedata.combining(c)
+    )
+    return re.sub(r"[^a-z0-9]+", " ", sin_tildes.lower()).strip()
+
+
+def _tiene_claves_rescate(consulta: str) -> bool:
+    texto = _normalizar(consulta)
+    return any(
+        re.search(rf"\b{re.escape(clave)}(?:es|s)?\b", texto)
+        for clave in CLAVES_RESCATE
+    )
+
 
 def _probabilidad(zona: dict, ficha: dict) -> float:
     """Probabilidad del corpus: ultimo contacto > ruta declarada > punto de retorno."""
@@ -71,6 +108,8 @@ def _resumen_plan(plan: dict) -> str:
 
 
 class AgenteRastreo(AgenteBase):
+    texto_fuera_de_dominio = TEXTO_FUERA_DE_DOMINIO_RESCATE
+
     def __init__(self, *args, dir_datos: str | Path | None = None, **kwargs):
         super().__init__(*args, **kwargs)
         self.dir_datos = Path(dir_datos) if dir_datos else None
@@ -91,6 +130,31 @@ class AgenteRastreo(AgenteBase):
             for e in equipos_disponibles(self.dir_datos)
         )
         return [("clima-simulado", clima), ("equipos-disponibles", equipos)]
+
+    def _fuera_de_dominio(self, consulta: str, fragmentos: list) -> bool:
+        if not consulta.strip():
+            return False
+        if _tiene_claves_rescate(consulta):
+            return False
+        mejor = fragmentos[0].score if fragmentos else None
+        return mejor is None or mejor > 0.70
+
+    def _plan_publicado(self) -> tuple[str, str] | None:
+        base = Path(self.dir_datos) if self.dir_datos else Path(__file__).resolve().parents[1] / "data"
+        archivos = list((base / "planes").glob("plan-v*.json"))
+        if not archivos:
+            return None
+        archivo = max(archivos, key=lambda p: int(p.stem.split("-v")[1]))
+        plan = json.loads(archivo.read_text(encoding="utf-8"))
+        return ("plan-publicado", "PLAN YA PUBLICADO: " + json.dumps(plan, ensure_ascii=False))
+
+    def consultar(self, consulta: str, sesion_id: str | None = None):
+        """Responde una consulta libre con RAG, tools y el plan publicado si existe."""
+        extra = []
+        plan = self._plan_publicado()
+        if plan:
+            extra.append(plan)
+        return self.procesar(consulta, sesion_id=sesion_id, herramientas_extra=extra)
 
     def _prioridad_zonas(self) -> list[str]:
         """Aplica `prioridad = probabilidad x facilidad / tiempo de barrido` (corpus)."""
@@ -194,7 +258,11 @@ class AgenteRastreo(AgenteBase):
         herramientas += ([recuerdo] if recuerdo else []) + self.verificaciones_extra(
             consulta, [], sesion_id
         )
-        fragmentos = self._buscar(consulta or "plan de busqueda por fases de una persona desaparecida")
+        fragmentos = estado.get("fragmentos")
+        if fragmentos is None:
+            fragmentos = self._buscar(
+                consulta or "plan de busqueda por fases de una persona desaparecida"
+            )
         return {"recuerdo": recuerdo, "herramientas": herramientas, "fragmentos": fragmentos}
 
     def _nodo_calcular(self, estado: EstadoPlan) -> dict:
@@ -270,13 +338,39 @@ class AgenteRastreo(AgenteBase):
         consulta: str = "",
     ) -> dict:
         """Ejecuta el grafo: calcula, publica el plan y devuelve el parte del LLM."""
+        fragmentos = None
+        if consulta.strip():
+            fragmentos = self._buscar(consulta)
+            if self._fuera_de_dominio(consulta, fragmentos):
+                mejor = fragmentos[0].score if fragmentos else None
+                self.trazador.registrar(
+                    "fuera_de_dominio", consulta=consulta, score_top1=mejor
+                )
+                if sesion_id:
+                    self.memoria.registrar_turno(
+                        sesion_id,
+                        consulta,
+                        resumen=self.texto_fuera_de_dominio[:200],
+                    )
+                return {
+                    "fuera_de_dominio": True,
+                    "texto": self.texto_fuera_de_dominio,
+                    "parte": self.texto_fuera_de_dominio,
+                    "plan": None,
+                    "fuentes_citadas": [],
+                    "archivo": "",
+                    "cito_plan_previo": False,
+                    "archivo_trace": str(self.trazador.archivo),
+                }
         estado = self.grafo.invoke({
             "version": version,
             "motivo_cambio": motivo_cambio or "",
             "sesion_id": sesion_id,
             "consulta": consulta,
+            "fragmentos": fragmentos,
         })
         return {
+            "fuera_de_dominio": False,
             "plan": estado["plan"],
             "archivo": estado["archivo"],
             "parte": estado["parte"],

@@ -16,7 +16,6 @@ import json
 import sys
 from pathlib import Path
 
-from agent.agente_base import AgenteBase
 from agent.llm_client import ClienteFalso, ClienteGroq, ClienteLangChain
 from agent.observabilidad import init_langsmith
 from agent.rastreo import AgenteRastreo
@@ -45,6 +44,11 @@ def _siguiente_version(dir_planes: Path) -> int:
 
 
 def mostrar_plan(r: dict) -> None:
+    if r.get("fuera_de_dominio"):
+        print("--- FUERA DE DOMINIO ---")
+        print(r["parte"])
+        print(f"Trace: {r['archivo_trace']}")
+        return
     plan = r["plan"]
     print(f"--- PLAN v{plan['version']} ({r['archivo']}) ---")
     print("Prioridad de zonas: " + " > ".join(plan["prioridad_zonas"]))
@@ -84,7 +88,7 @@ def main() -> int:
         llm = ClienteGroq()
     else:
         llm = ClienteLangChain()
-    agente = AgenteRastreo(llm=llm) if args.plan else AgenteBase(llm=llm)
+    agente = AgenteRastreo(llm=llm)
 
     archivo_trace = RAIZ / "logs" / "trace.jsonl"
     lineas_previas = len(archivo_trace.read_text(encoding="utf-8").strip().split("\n")) if archivo_trace.exists() else 0
@@ -106,7 +110,7 @@ def main() -> int:
             mostrar_trace(plan["archivo_trace"], omitir=lineas_previas)
         return 0
 
-    r = agente.procesar(args.consulta, sesion_id=args.sesion)
+    r = agente.consultar(args.consulta, sesion_id=args.sesion)
 
     if args.salida:
         if r.fuera_de_dominio:

@@ -43,6 +43,9 @@ class RespuestaBase:
 
 
 class AgenteBase:
+    umbral_fuera_de_dominio = UMBRAL_FUERA_DE_DOMINIO
+    texto_fuera_de_dominio = TEXTO_FUERA_DE_DOMINIO
+
     def __init__(
         self,
         llm: ClienteLLM | None = None,
@@ -73,7 +76,10 @@ class AgenteBase:
         self, respuesta: str, fragmentos: list[Fragmento], herramientas: list
     ) -> list[str]:
         fuentes: list[str] = []
-        for letra, numero in REGEX_CITAS.findall(respuesta):
+        # Groq a veces inserta caracteres de ancho cero o corchetes CJK.
+        limpia = re.sub(r"[\u200b\u200c\u200d\ufeff]", "", respuesta)
+        limpia = limpia.replace("【", "[").replace("】", "]")
+        for letra, numero in REGEX_CITAS.findall(limpia):
             n = int(numero)
             if letra == "F" and 1 <= n <= len(fragmentos):
                 fuente = fragmentos[n - 1].fuente
@@ -85,8 +91,17 @@ class AgenteBase:
                 fuentes.append(fuente)
         return fuentes
 
+    def _fuera_de_dominio(self, consulta: str, fragmentos: list[Fragmento]) -> bool:
+        mejor = fragmentos[0].score if fragmentos else None
+        return mejor is None or mejor > self.umbral_fuera_de_dominio
+
     @traceable("procesar")
-    def procesar(self, consulta: str, sesion_id: str | None = None) -> RespuestaBase:
+    def procesar(
+        self,
+        consulta: str,
+        sesion_id: str | None = None,
+        herramientas_extra: list[tuple[str, str]] | None = None,
+    ) -> RespuestaBase:
         self.trazador.registrar("consulta", texto=consulta, sesion_id=sesion_id)
 
         # Memoria IE3/IE4: historial corto + recuerdos semanticos de la sesion.
@@ -110,19 +125,21 @@ class AgenteBase:
         )
 
         # Puerta fuera de dominio: si nada pertinente a la vista, redirigir sin gastar LLM.
-        mejor = fragmentos[0].score if fragmentos else None
-        if mejor is None or mejor > UMBRAL_FUERA_DE_DOMINIO:
+        if self._fuera_de_dominio(consulta, fragmentos):
+            mejor = fragmentos[0].score if fragmentos else None
             self.trazador.registrar("fuera_de_dominio", consulta=consulta, score_top1=mejor)
             if sesion_id:
                 self.memoria.registrar_turno(sesion_id, consulta, "fuera de dominio")
             return RespuestaBase(
-                texto=TEXTO_FUERA_DE_DOMINIO,
+                texto=self.texto_fuera_de_dominio,
                 fuera_de_dominio=True,
                 archivo_trace=str(self.trazador.archivo),
             )
 
         herramientas: list[tuple[str, str]] = [(r.fuente, r.texto) for r in recuerdos]
         herramientas += self.verificaciones_extra(consulta, fragmentos, sesion_id)
+        if herramientas_extra:
+            herramientas += herramientas_extra
 
         pedido = consulta + ("\n" + bloque_memoria if bloque_memoria else "")
         usuario = armar_usuario(pedido, fragmentos, herramientas or None)

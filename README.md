@@ -13,7 +13,7 @@ pronóstico ficticios. No apto para operaciones reales.
 ```powershell
 uv sync
 uv run python -m ingestion.ingest          # corpus -> Chroma (2/2 MATCH)
-uv run python -m pytest -q                 # 14 passed (motor 8 + dominio 6)
+uv run python -m pytest -q                 # 19 passed (motor 8 + dominio 6 + consulta 5)
 
 # Deja el estado limpio: borra planes/trazas/memoria y restaura clima-base.json
 uv run python scripts/reset_demo.py
@@ -53,6 +53,12 @@ viento → Replanificar**. La UI reutiliza `scripts/reset_demo.py`,
 `scripts/aplicar_viento.py` y `AgenteRastreo.planificar`; no duplica la lógica
 del agente ni cambia el plan calculado. Si falla la red o la cuota, usa el CLI
 con `--falso` como plan B y dilo explícitamente.
+
+El botón **Consultar** responde dudas dentro del dominio con RAG, clima,
+equipos y el plan publicado (`plan-publicado`); no publica ni versiona un plan.
+Si la consulta está fuera del operativo (por ejemplo, "¿cuál es la capital de
+Francia?"), responde con un rechazo explícito y ejemplos, sin gastar LLM ni
+crear archivos. Es la misma puerta de dominio que usa `planificar`.
 
 ## Arquitectura
 
@@ -114,7 +120,7 @@ flowchart TB
 
 ## Estado
 
-- Tests: 14/14 (`uv run python -m pytest -q`); incluye recuperación semántica en `contexto` y citas con espacios.
+- Tests: 19/19 (`uv run python -m pytest -q`); incluye recuperación semántica en `contexto`, citas con espacios y la puerta de dominio del modo consulta.
 - LangGraph: 5 nodos en `agent/grafo.py`; el test del grafo cubre el flujo completo.
 - Actos 1 y 2 verificados end-to-end el 2026-10-19 con Groq real
   (`openai/gpt-oss-120b`); evidencia en `docs/`.

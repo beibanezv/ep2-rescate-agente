@@ -415,6 +415,7 @@ def _reset() -> None:
         "viento",
         "modo",
         "modelo",
+        "consulta_resultado",
     ):
         st.session_state.pop(clave, None)
     st.rerun()
@@ -448,6 +449,16 @@ def _publicar(version: int, consulta: str, sesion: str, fake: bool) -> None:
         st.error(f"No se pudo publicar el plan: {exc}")
         return
 
+    if resultado.get("fuera_de_dominio"):
+        st.session_state["consulta_resultado"] = {
+            "texto": resultado["parte"],
+            "fuera_de_dominio": True,
+            "fuentes": [],
+            "modelo": "ClienteFalso (sin Groq)" if fake else getattr(llm, "modelo", "Groq"),
+            "trace": _leer_trace(resultado["archivo_trace"], previas),
+        }
+        st.rerun()
+
     previo = next((p for p in _planes() if p.get("version") == version - 1), None)
     plan = resultado["plan"]
     plan["_archivo"] = Path(resultado["archivo"]).name
@@ -460,6 +471,30 @@ def _publicar(version: int, consulta: str, sesion: str, fake: bool) -> None:
     st.session_state["modelo"] = (
         "ClienteFalso (sin Groq)" if fake else getattr(llm, "modelo", "Groq")
     )
+    st.rerun()
+
+
+def _consultar(consulta: str, sesion: str, fake: bool) -> None:
+    if not fake and not os.getenv("GROQ_API_KEY"):
+        st.error("Falta GROQ_API_KEY en .env. Activa el modo determinista o configura la clave.")
+        return
+    archivo_trace = RAIZ / "logs" / "trace.jsonl"
+    previas = _contar_lineas(archivo_trace)
+    llm = ClienteFalso() if fake else ClienteLangChain()
+    agente = AgenteRastreo(llm=llm)
+    try:
+        with st.spinner("Consultando el corpus y el plan publicado..."):
+            r = agente.consultar(consulta, sesion_id=sesion or None)
+    except Exception as exc:
+        st.error(f"No se pudo responder la consulta: {exc}")
+        return
+    st.session_state["consulta_resultado"] = {
+        "texto": r.texto,
+        "fuera_de_dominio": r.fuera_de_dominio,
+        "fuentes": r.fuentes_citadas,
+        "modelo": "ClienteFalso (sin Groq)" if fake else getattr(llm, "modelo", "Groq"),
+        "trace": _leer_trace(r.archivo_trace, previas),
+    }
     st.rerun()
 
 
@@ -656,6 +691,7 @@ archivo_actual = st.session_state.get("plan_archivo") or (
 )
 viento = st.session_state.get("viento", _viento_aplicado(franjas))
 resultado = st.session_state.get("resultado")
+consulta_resultado = st.session_state.get("consulta_resultado")
 trace = st.session_state.get("trace", [])
 
 st.session_state.setdefault("consulta", CONSULTA_DEFECTO)
@@ -681,7 +717,7 @@ with fila_inputs[2]:
 
 header_slot.markdown(_header_html(plan_actual, franjas, fake), unsafe_allow_html=True)
 
-acciones = st.columns([1.15, 1, 1, 1])
+acciones = st.columns([1.15, 1, 1, 1, 1])
 with acciones[0]:
     boton_plan = st.button(
         "Publicar plan inicial",
@@ -690,24 +726,32 @@ with acciones[0]:
         disabled=plan_actual is not None,
     )
 with acciones[1]:
+    boton_consulta = st.button(
+        "Consultar",
+        use_container_width=True,
+        help="Responde una duda con RAG, clima, equipos y el plan publicado. No publica un plan.",
+    )
+with acciones[2]:
     boton_viento = st.button(
         "Aplicar viento",
         use_container_width=True,
         disabled=plan_actual is None or viento or plan_actual.get("version", 1) >= 2,
     )
-with acciones[2]:
+with acciones[3]:
     boton_replan = st.button(
         "Replanificar",
         use_container_width=True,
         disabled=not (plan_actual and plan_actual.get("version", 1) == 1 and viento),
     )
-with acciones[3]:
+with acciones[4]:
     boton_reset = st.button("Reiniciar escenario", use_container_width=True)
 
 if boton_reset:
     _reset()
 if boton_plan:
     _publicar(1, consulta, sesion, fake)
+if boton_consulta:
+    _consultar(consulta or CONSULTA_DEFECTO, sesion, fake)
 if boton_viento:
     _aplicar_viento()
 if boton_replan:
@@ -722,6 +766,21 @@ with columnas[1]:
     st.markdown(_plan_html(plan_actual, plan_previo, archivo_actual), unsafe_allow_html=True)
 with columnas[2]:
     st.markdown(_trace_html(resultado, trace, plan_actual), unsafe_allow_html=True)
+
+if consulta_resultado:
+    with st.container(border=True):
+        st.markdown(
+            f'<div class="panel-head" style="margin:-0.8rem -0.9rem 0.8rem;background:transparent;border-bottom:1px solid var(--line)">'
+            f'<h2 style="margin:0;color:var(--muted);font:600 .66rem/1.3 var(--mono);letter-spacing:.1em;text-transform:uppercase">Consulta del operador</h2>'
+            f'<span class="panel-meta">modelo: {_e(consulta_resultado.get("modelo", "—"))}</span></div>',
+            unsafe_allow_html=True,
+        )
+        if consulta_resultado.get("fuera_de_dominio"):
+            st.warning(consulta_resultado["texto"])
+        else:
+            st.markdown(consulta_resultado["texto"])
+            if consulta_resultado.get("fuentes"):
+                st.caption("Fuentes: " + ", ".join(consulta_resultado["fuentes"]))
 
 if resultado:
     with st.container(border=True):
