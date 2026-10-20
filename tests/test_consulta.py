@@ -113,6 +113,17 @@ def test_consulta_incluye_plan_publicado(tmp_path, monkeypatch):
     assert "plan-publicado" in llm.usuario
 
 
+def test_consulta_expone_el_modelo_usado(tmp_path, monkeypatch):
+    datos = _datos(tmp_path)
+    agente = _agente(tmp_path, datos, RecuperadorGuion("no-existe"), ClienteFalso(), monkeypatch)
+
+    r = agente.consultar("que equipos hay disponibles")
+
+    assert r.fuera_de_dominio is False
+    assert r.modelo == "cliente-falso"
+    assert r.n_herramientas >= 1
+
+
 def test_planificar_fuera_de_dominio_no_publica(tmp_path, monkeypatch):
     datos = _datos(tmp_path)
     agente = _agente(

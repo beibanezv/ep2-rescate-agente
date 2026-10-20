@@ -13,6 +13,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 import streamlit as st
@@ -270,6 +271,27 @@ def _contar_medio(plan: dict, medio: str) -> int:
     return sum(1 for fase in plan.get("fases", []) if medio in fase.get("medios", []))
 
 
+def _why_html(fase: dict, prioridad: list[str]) -> str:
+    zona_id = fase.get("zona", "")
+    zona = ZONAS.get(zona_id, {})
+    puesto = prioridad.index(zona_id) + 1 if zona_id in prioridad else "—"
+    medios = "".join(
+        f'<li><b class="mono">{_e(medio)}</b> · {_e(EQUIPOS.get(medio, {}).get("nombre", "equipo"))}: '
+        f'{_e(EQUIPOS.get(medio, {}).get("restricciones", "sin restricciones registradas"))}</li>'
+        for medio in fase.get("medios", [])
+    )
+    return (
+        '<details class="why"><summary>¿Por qué esta fase?</summary>'
+        f'<p><b>{_e(zona.get("nombre", zona_id))}</b> · {_e(zona.get("altitud_m", "—"))} m · '
+        f'{_e(zona.get("acceso", "acceso no registrado"))} · barrido {_e(zona.get("barrido_terrestre_h", "—"))} h · '
+        f'dron {_e(zona.get("dron", "—"))}. Prioridad #{puesto} '
+        f'(probabilidad × facilidad / tiempo de barrido).</p>'
+        f'<ul>{medios}</ul>'
+        '<p class="why-source">Fuente: zonas.json · equipos.json · protocolo-busqueda §3.</p>'
+        "</details>"
+    )
+
+
 def _plan_html(plan: dict | None, previo: dict | None, archivo: str = "") -> str:
     if not plan:
         return _panel(
@@ -311,6 +333,7 @@ def _plan_html(plan: dict | None, previo: dict | None, archivo: str = "") -> str
                 '<div class="phase-body">'
                 f'<p class="phase-objective">{_e(fase.get("objetivo"))}</p>'
                 f'<div class="chips">{medios}</div>'
+                f"{_why_html(fase, prioridad)}"
                 "</div></div>"
             )
         fases_html.append(
@@ -573,19 +596,25 @@ def _consultar(consulta: str, sesion: str, fake: bool) -> None:
     previas = _contar_lineas(trazador.archivo)
     llm = ClienteFalso() if fake else ClienteLangChain()
     agente = AgenteRastreo(llm=llm, trazador=trazador, dir_datos=DIR_DATOS)
+    inicio = time.perf_counter()
     try:
         with st.spinner("Consultando el corpus y el plan publicado..."):
             r = agente.consultar(consulta, sesion_id=sesion or None)
     except Exception as exc:
         st.error(f"No se pudo responder la consulta: {exc}")
         return
-    st.session_state["consulta_resultado"] = {
+    turno = {
+        "pregunta": consulta,
         "texto": r.texto,
         "fuera_de_dominio": r.fuera_de_dominio,
         "fuentes": r.fuentes_citadas,
         "modelo": "ClienteFalso (sin Groq)" if fake else getattr(llm, "modelo", "Groq"),
+        "n_herramientas": r.n_herramientas,
+        "ms": (time.perf_counter() - inicio) * 1000,
         "trace": _leer_trace(r.archivo_trace, previas),
     }
+    st.session_state.setdefault("chat", []).append(turno)
+    st.session_state["consulta_resultado"] = turno
     st.rerun()
 
 
@@ -699,6 +728,11 @@ h1, h2, h3 { letter-spacing: -0.02em; }
 .phase-zone { color: var(--accent); font-size: 0.72rem; padding-top: 0.08rem; }
 .phase-objective { margin: 0; color: var(--text); font-size: 0.72rem; line-height: 1.45; }
 .chips { display: flex; flex-wrap: wrap; gap: 0.28rem; margin-top: 0.35rem; }
+.why { margin-top: 0.42rem; border-top: 1px dotted rgba(70,83,87,0.55); padding-top: 0.32rem; }
+.why summary { cursor: pointer; color: var(--amber); font: 700 0.62rem/1.2 "IBM Plex Mono", monospace; letter-spacing: 0.04em; }
+.why p { margin: 0.35rem 0 0; color: var(--muted); font-size: 0.66rem; line-height: 1.45; }
+.why ul { margin: 0.3rem 0 0; padding-left: 1rem; color: var(--muted); font-size: 0.66rem; line-height: 1.45; }
+.why-source { opacity: 0.75; }
 .chip { display: inline-flex; align-items: center; gap: 0.22rem; max-width: 100%; padding: 0.12rem 0.34rem; border: 1px solid var(--line); color: var(--muted); font: 0.6rem/1.35 var(--mono); overflow-wrap: anywhere; }
 .chip-medio b { color: var(--accent); font-weight: 600; }
 .change { margin-top: 0.8rem; padding: 0.55rem 0.6rem; border: 1px solid rgba(217,160,91,0.38); background: var(--accent-soft); }
@@ -890,20 +924,32 @@ with columnas[1]:
 with columnas[2]:
     st.markdown(_trace_html(resultado, trace, plan_actual), unsafe_allow_html=True)
 
-if consulta_resultado:
+chat = st.session_state.get("chat", [])
+if chat:
     with st.container(border=True):
         st.markdown(
             f'<div class="panel-head" style="margin:-0.8rem -0.9rem 0.8rem;background:transparent;border-bottom:1px solid var(--line)">'
-            f'<h2 style="margin:0;color:var(--muted);font:600 .66rem/1.3 var(--mono);letter-spacing:.1em;text-transform:uppercase">Consulta del operador</h2>'
-            f'<span class="panel-meta">modelo: {_e(consulta_resultado.get("modelo", "—"))}</span></div>',
+            f'<h2 style="margin:0;color:var(--muted);font:600 .66rem/1.3 var(--mono);letter-spacing:.1em;text-transform:uppercase">Chat del operador</h2>'
+            f'<span class="panel-meta">{len(chat)} turnos · sesión {_e(sesion or "sin sesión")}</span></div>',
             unsafe_allow_html=True,
         )
-        if consulta_resultado.get("fuera_de_dominio"):
-            st.warning(consulta_resultado["texto"])
-        else:
-            st.markdown(consulta_resultado["texto"])
-            if consulta_resultado.get("fuentes"):
-                st.caption("Fuentes: " + ", ".join(consulta_resultado["fuentes"]))
+        for turno in chat:
+            st.markdown(f"**Operador ·** {turno['pregunta']}")
+            if turno.get("fuera_de_dominio"):
+                st.warning(turno["texto"])
+            else:
+                st.markdown(turno["texto"])
+                if turno.get("fuentes"):
+                    st.caption("Fuentes: " + ", ".join(turno["fuentes"]))
+            st.caption(
+                f"modelo: {turno.get('modelo', '—')} · "
+                f"{turno.get('ms', 0):.0f} ms · "
+                f"{turno.get('n_herramientas', 0)} herramientas"
+            )
+        if st.button("Limpiar chat", key="limpiar_chat"):
+            st.session_state.pop("chat", None)
+            st.session_state.pop("consulta_resultado", None)
+            st.rerun()
 
 if resultado:
     with st.container(border=True):

@@ -40,6 +40,8 @@ class RespuestaBase:
     fuentes_citadas: list[str] = field(default_factory=list)
     fuera_de_dominio: bool = False
     archivo_trace: str = ""
+    modelo: str = ""
+    n_herramientas: int = 0
 
 
 class AgenteBase:
@@ -134,6 +136,7 @@ class AgenteBase:
                 texto=self.texto_fuera_de_dominio,
                 fuera_de_dominio=True,
                 archivo_trace=str(self.trazador.archivo),
+                modelo="sin LLM (fuera de dominio)",
             )
 
         herramientas: list[tuple[str, str]] = [(r.fuente, r.texto) for r in recuerdos]
@@ -160,4 +163,6 @@ class AgenteBase:
             fragmentos=fragmentos,
             fuentes_citadas=fuentes,
             archivo_trace=str(self.trazador.archivo),
+            modelo=respuesta.modelo,
+            n_herramientas=len(herramientas),
         )
