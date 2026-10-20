@@ -1,0 +1,55 @@
+{
+  "sector": "El Morado (simulado)",
+  "zonas": [
+    {
+      "id": "Z-1",
+      "nombre": "Refugio El Morado y sendero alto",
+      "altitud_m": 2650,
+      "acceso": "vehicular hasta el refugio (1,5 h de base), luego a pie",
+      "barrido_terrestre_h": 4,
+      "dron": "adecuado",
+      "helicoptero": "helipuerto de montaña junto al refugio",
+      "refugios": ["Refugio El Morado"]
+    },
+    {
+      "id": "Z-2",
+      "nombre": "Mirador de la cascada",
+      "altitud_m": 2100,
+      "acceso": "sendero marcado (1 h de base)",
+      "barrido_terrestre_h": 1.5,
+      "dron": "adecuado",
+      "helicoptero": "zona de aterrizaje informal 400 m antes del mirador",
+      "refugios": []
+    },
+    {
+      "id": "Z-3",
+      "nombre": "Quebrada del Plomo (zona alta)",
+      "altitud_m": 3400,
+      "acceso": "solo a pie con equipo técnico (5 h de base)",
+      "barrido_terrestre_h": 7,
+      "dron": "limitado (quebrada encajonada)",
+      "helicoptero": "no aterriza; solo sobrevuelo",
+      "refugios": []
+    },
+    {
+      "id": "Z-4",
+      "nombre": "Morrena del glaciar bajo",
+      "altitud_m": 3050,
+      "acceso": "a pie por terreno inestable (4,5 h de base)",
+      "barrido_terrestre_h": 6,
+      "dron": "limitado",
+      "helicoptero": "no aterriza; solo sobrevuelo",
+      "refugios": []
+    },
+    {
+      "id": "Z-5",
+      "nombre": "Camino de servicio al embalse",
+      "altitud_m": 1950,
+      "acceso": "vehicular (40 min de base)",
+      "barrido_terrestre_h": 2,
+      "dron": "adecuado",
+      "helicoptero": "tarima junto al embalse",
+      "refugios": []
+    }
+  ]
+}

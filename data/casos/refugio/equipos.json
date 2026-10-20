@@ -1,0 +1,49 @@
+{
+  "equipos": [
+    {
+      "id": "EQ-1",
+      "nombre": "Brigada de montaña Alfa",
+      "tipo": "terrestre",
+      "personas": 6,
+      "autonomia_h": 8,
+      "disponible_desde": "05:30",
+      "restricciones": "no ingresa a zonas altas (Z-3/Z-4) sin aclimatación previa"
+    },
+    {
+      "id": "EQ-2",
+      "nombre": "Brigada nocturna Bravo",
+      "tipo": "terrestre",
+      "personas": 4,
+      "autonomia_h": 6,
+      "disponible_desde": "22:45",
+      "restricciones": "solo senderos y caminos con iluminación propia; no zonas técnicas"
+    },
+    {
+      "id": "K9-1",
+      "nombre": "Can de búsqueda Lira",
+      "tipo": "k9",
+      "personas": 2,
+      "autonomia_h": 4,
+      "disponible_desde": "23:00",
+      "restricciones": "solo senderos limpios; no pendientes técnicas"
+    },
+    {
+      "id": "DR-1",
+      "nombre": "Dron térmico Cóndor",
+      "tipo": "aereo",
+      "personas": 2,
+      "autonomia_h": 3,
+      "disponible_desde": "06:00",
+      "restricciones": "viento máximo 40 km/h; solo con luz diurna"
+    },
+    {
+      "id": "HEL-1",
+      "nombre": "Helicóptero (convenio Carabineros)",
+      "tipo": "aereo",
+      "personas": 4,
+      "autonomia_h": 4,
+      "disponible_desde": "06:00",
+      "restricciones": "viento < 35 km/h y visibilidad > 5 km en la zona asignada; solo con luz diurna"
+    }
+  ]
+}

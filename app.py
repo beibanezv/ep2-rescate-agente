@@ -8,6 +8,7 @@ Por defecto usa Groq real; el interruptor "Modo determinista" usa
 import html
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -21,6 +22,7 @@ load_dotenv(RAIZ / ".env")
 from agent.llm_client import ClienteFalso, ClienteLangChain
 from agent.observabilidad import init_langsmith
 from agent.rastreo import AgenteRastreo
+from agent.trace import Trazador
 
 init_langsmith()
 
@@ -35,6 +37,18 @@ CONSULTA_DEFECTO = (
 )
 SESION_DEFECTO = "caso-morado"
 
+CASOS = {
+    "morado": {"nombre": "El Morado · M. Torres", "dir": RAIZ / "data"},
+    "refugio": {
+        "nombre": "Refugio · L. Fuentes",
+        "dir": RAIZ / "data" / "casos" / "refugio",
+    },
+    "mirador": {
+        "nombre": "Mirador · J. Silva",
+        "dir": RAIZ / "data" / "casos" / "mirador",
+    },
+}
+
 
 def _e(valor) -> str:
     return html.escape(str(valor if valor is not None else ""))
@@ -47,19 +61,37 @@ def _leer_json(ruta: Path, defecto):
         return defecto
 
 
-FICHA = _leer_json(RAIZ / "data" / "ficha-persona.json", {})
+def _limpiar_estado() -> None:
+    for clave in (
+        "resultado",
+        "trace",
+        "plan_actual",
+        "plan_previo",
+        "plan_archivo",
+        "consulta_resultado",
+        "chat",
+        "viento",
+        "modo",
+        "modelo",
+    ):
+        st.session_state.pop(clave, None)
+
+
+DIR_DATOS = CASOS[st.session_state.get("caso_activo", "morado")]["dir"]
+FICHA = _leer_json(DIR_DATOS / "ficha-persona.json", {})
 ZONAS = {
     z["id"]: z
-    for z in _leer_json(RAIZ / "data" / "zonas.json", {"zonas": []})["zonas"]
+    for z in _leer_json(DIR_DATOS / "zonas.json", {"zonas": []})["zonas"]
 }
 EQUIPOS = {
     e["id"]: e
-    for e in _leer_json(RAIZ / "data" / "equipos.json", {"equipos": []})["equipos"]
+    for e in _leer_json(DIR_DATOS / "equipos.json", {"equipos": []})["equipos"]
 }
 
 
-def _franjas() -> list[dict]:
-    return _leer_json(RAIZ / "data" / "clima.json", {"franjas": []}).get("franjas", [])
+def _franjas(dir_datos: Path | None = None) -> list[dict]:
+    base = dir_datos or DIR_DATOS
+    return _leer_json(base / "clima.json", {"franjas": []}).get("franjas", [])
 
 
 def _viento_aplicado(franjas: list[dict]) -> bool:
@@ -70,9 +102,10 @@ def _viento_aplicado(franjas: list[dict]) -> bool:
     )
 
 
-def _planes() -> list[dict]:
+def _planes(dir_datos: Path | None = None) -> list[dict]:
+    base = dir_datos or DIR_DATOS
     planes = []
-    for ruta in sorted((RAIZ / "data" / "planes").glob("plan-v*.json")):
+    for ruta in sorted((base / "planes").glob("plan-v*.json")):
         try:
             plan = json.loads(ruta.read_text(encoding="utf-8"))
             plan["_archivo"] = ruta.name
@@ -306,7 +339,7 @@ def _trace_html(resultado: dict | None, trace: list[dict], plan: dict | None) ->
     if not resultado:
         return _panel(
             "Trazabilidad",
-            "trace.jsonl",
+            _trazador_actual().archivo.name,
             _empty(
                 "Esperando una corrida",
                 "Cada plan registra contexto, cálculo, publicación, redacción y memoria.",
@@ -354,7 +387,12 @@ def _trace_html(resultado: dict | None, trace: list[dict], plan: dict | None) ->
         '<div class="section-sub">REGLAS CITADAS</div>'
         f'<ul class="citas">{citas_html}</ul>'
     )
-    return _panel("Trazabilidad", "trace.jsonl", cuerpo)
+    return _panel("Trazabilidad", _trazador_actual().archivo.name, cuerpo)
+
+
+def _ruta_corta() -> str:
+    zonas = list(dict.fromkeys(re.findall(r"Z-\d", FICHA.get("ruta_declarada", ""))))
+    return " → ".join(zonas) if zonas else "—"
 
 
 def _header_html(plan: dict | None, franjas: list[dict], fake: bool) -> str:
@@ -368,13 +406,13 @@ def _header_html(plan: dict | None, franjas: list[dict], fake: bool) -> str:
         if str(f.get("desde", "")).endswith("06:00")
     ]
     viento = f"{max(vientos)} km/h máx." if vientos else "sin dato"
-    persona = FICHA.get("persona", "M. Torres, 34 años")
-    ultimo = FICHA.get("ultimo_contacto", "17-10 a las 14:05, mirador (Z-2)")
+    persona = FICHA.get("persona", "—")
+    ultimo = FICHA.get("ultimo_contacto", "—")
     return (
         '<div class="topbar">'
         '<div class="brand"><span class="brand-mark">CO</span>'
         "<div><h1>El Morado</h1>"
-        "<p>Caso 2026-0142 · centro de operaciones</p></div></div>"
+        f"<p>Caso {_e(FICHA.get('caso', '—'))} · centro de operaciones</p></div></div>"
         f'<div class="top-meta"><span class="dot"></span><span>{_e(estado)}</span>'
         f'<span class="sep"></span><span class="mode {modo_clase}">{_e(modo)}</span></div>'
         "</div>"
@@ -383,16 +421,16 @@ def _header_html(plan: dict | None, franjas: list[dict], fake: bool) -> str:
         f"<h2>{_e(persona)}</h2>"
         f'<p class="hero-copy">Último contacto: {_e(ultimo)}</p></div>'
         '<div class="hero-facts">'
-        f'<div><span>RUTA DECLARADA</span><b>Z-2 → Z-5</b></div>'
+        f'<div><span>RUTA DECLARADA</span><b>{_e(_ruta_corta())}</b></div>'
         f'<div><span>PRIORIDAD</span><b>{_e(prioridad)}</b></div>'
         f'<div><span>VIENTO 06–12</span><b>{_e(viento)}</b></div>'
         "</div></div>"
     )
 
 
-def _ejecutar_script(nombre: str) -> subprocess.CompletedProcess:
+def _ejecutar_script(nombre: str, args: list[str] | None = None) -> subprocess.CompletedProcess:
     return subprocess.run(
-        [sys.executable, str(RAIZ / "scripts" / nombre)],
+        [sys.executable, str(RAIZ / "scripts" / nombre), *(args or [])],
         cwd=RAIZ,
         capture_output=True,
         text=True,
@@ -401,8 +439,13 @@ def _ejecutar_script(nombre: str) -> subprocess.CompletedProcess:
     )
 
 
+def _trazador_actual() -> Trazador:
+    caso = st.session_state.get("caso_activo", "morado")
+    return Trazador(archivo=RAIZ / "logs" / f"trace-{caso}.jsonl")
+
+
 def _reset() -> None:
-    resultado = _ejecutar_script("reset_demo.py")
+    resultado = _ejecutar_script("reset_demo.py", ["--dir-datos", str(DIR_DATOS)])
     if resultado.returncode != 0:
         st.error(f"No se pudo reiniciar: {resultado.stderr.strip()}")
         return
@@ -434,10 +477,10 @@ def _publicar(version: int, consulta: str, sesion: str, fake: bool) -> None:
     if not fake and not os.getenv("GROQ_API_KEY"):
         st.error("Falta GROQ_API_KEY en .env. Activa el modo determinista o configura la clave.")
         return
-    archivo_trace = RAIZ / "logs" / "trace.jsonl"
-    previas = _contar_lineas(archivo_trace)
+    trazador = _trazador_actual()
+    previas = _contar_lineas(trazador.archivo)
     llm = ClienteFalso() if fake else ClienteLangChain()
-    agente = AgenteRastreo(llm=llm)
+    agente = AgenteRastreo(llm=llm, trazador=trazador, dir_datos=DIR_DATOS)
     try:
         with st.spinner("Calculando prioridad, fases y viabilidad de medios..."):
             resultado = agente.planificar(
@@ -459,7 +502,7 @@ def _publicar(version: int, consulta: str, sesion: str, fake: bool) -> None:
         }
         st.rerun()
 
-    previo = next((p for p in _planes() if p.get("version") == version - 1), None)
+    previo = next((p for p in _planes(DIR_DATOS) if p.get("version") == version - 1), None)
     plan = resultado["plan"]
     plan["_archivo"] = Path(resultado["archivo"]).name
     st.session_state["resultado"] = resultado
@@ -478,10 +521,10 @@ def _consultar(consulta: str, sesion: str, fake: bool) -> None:
     if not fake and not os.getenv("GROQ_API_KEY"):
         st.error("Falta GROQ_API_KEY en .env. Activa el modo determinista o configura la clave.")
         return
-    archivo_trace = RAIZ / "logs" / "trace.jsonl"
-    previas = _contar_lineas(archivo_trace)
+    trazador = _trazador_actual()
+    previas = _contar_lineas(trazador.archivo)
     llm = ClienteFalso() if fake else ClienteLangChain()
-    agente = AgenteRastreo(llm=llm)
+    agente = AgenteRastreo(llm=llm, trazador=trazador, dir_datos=DIR_DATOS)
     try:
         with st.spinner("Consultando el corpus y el plan publicado..."):
             r = agente.consultar(consulta, sesion_id=sesion or None)
@@ -675,8 +718,16 @@ div[data-baseweb="textarea"] textarea { font-size: 0.76rem; line-height: 1.45; }
 
 st.markdown(f"<style>{CSS}</style>", unsafe_allow_html=True)
 
-franjas = _franjas()
-planes = _planes()
+st.selectbox(
+    "Caso activo",
+    options=list(CASOS),
+    format_func=lambda caso: CASOS[caso]["nombre"],
+    key="caso_activo",
+    on_change=_limpiar_estado,
+)
+
+franjas = _franjas(DIR_DATOS)
+planes = _planes(DIR_DATOS)
 plan_actual = st.session_state.get("plan_actual")
 if plan_actual is None:
     plan_actual = planes[-1] if planes else None

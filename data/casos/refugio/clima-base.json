@@ -1,0 +1,20 @@
+{
+  "nota": "Pronóstico SIMULADO del sector (editable para ejercicios). El evento del Acto 2 del brief reemplaza las franjas de 06:00-12:00.",
+  "franjas": [
+    { "zona": "Z-1", "desde": "2026-10-17 22:00", "hasta": "2026-10-18 06:00", "viento_kmh": 24, "visibilidad_km": 9, "temp_c": 3, "precipitacion_mm": 0 },
+    { "zona": "Z-1", "desde": "2026-10-18 06:00", "hasta": "2026-10-18 12:00", "viento_kmh": 18, "visibilidad_km": 12, "temp_c": 6, "precipitacion_mm": 0 },
+    { "zona": "Z-1", "desde": "2026-10-18 12:00", "hasta": "2026-10-18 18:00", "viento_kmh": 26, "visibilidad_km": 10, "temp_c": 11, "precipitacion_mm": 0 },
+    { "zona": "Z-2", "desde": "2026-10-17 22:00", "hasta": "2026-10-18 06:00", "viento_kmh": 20, "visibilidad_km": 9, "temp_c": 4, "precipitacion_mm": 0 },
+    { "zona": "Z-2", "desde": "2026-10-18 06:00", "hasta": "2026-10-18 12:00", "viento_kmh": 15, "visibilidad_km": 14, "temp_c": 8, "precipitacion_mm": 0 },
+    { "zona": "Z-2", "desde": "2026-10-18 12:00", "hasta": "2026-10-18 18:00", "viento_kmh": 24, "visibilidad_km": 12, "temp_c": 13, "precipitacion_mm": 0 },
+    { "zona": "Z-3", "desde": "2026-10-17 22:00", "hasta": "2026-10-18 06:00", "viento_kmh": 30, "visibilidad_km": 6, "temp_c": -2, "precipitacion_mm": 0 },
+    { "zona": "Z-3", "desde": "2026-10-18 06:00", "hasta": "2026-10-18 12:00", "viento_kmh": 20, "visibilidad_km": 10, "temp_c": 0, "precipitacion_mm": 0 },
+    { "zona": "Z-3", "desde": "2026-10-18 12:00", "hasta": "2026-10-18 18:00", "viento_kmh": 34, "visibilidad_km": 8, "temp_c": 3, "precipitacion_mm": 0 },
+    { "zona": "Z-4", "desde": "2026-10-17 22:00", "hasta": "2026-10-18 06:00", "viento_kmh": 32, "visibilidad_km": 5, "temp_c": -3, "precipitacion_mm": 0 },
+    { "zona": "Z-4", "desde": "2026-10-18 06:00", "hasta": "2026-10-18 12:00", "viento_kmh": 23, "visibilidad_km": 9, "temp_c": -1, "precipitacion_mm": 0 },
+    { "zona": "Z-4", "desde": "2026-10-18 12:00", "hasta": "2026-10-18 18:00", "viento_kmh": 36, "visibilidad_km": 7, "temp_c": 2, "precipitacion_mm": 0 },
+    { "zona": "Z-5", "desde": "2026-10-17 22:00", "hasta": "2026-10-18 06:00", "viento_kmh": 18, "visibilidad_km": 8, "temp_c": 5, "precipitacion_mm": 0 },
+    { "zona": "Z-5", "desde": "2026-10-18 06:00", "hasta": "2026-10-18 12:00", "viento_kmh": 14, "visibilidad_km": 15, "temp_c": 9, "precipitacion_mm": 0 },
+    { "zona": "Z-5", "desde": "2026-10-18 12:00", "hasta": "2026-10-18 18:00", "viento_kmh": 22, "visibilidad_km": 12, "temp_c": 14, "precipitacion_mm": 0 }
+  ]
+}
