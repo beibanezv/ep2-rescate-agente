@@ -1,5 +1,6 @@
 """Trazabilidad: cada paso del loop queda registrado en logs/trace.jsonl (requisito 5 del encargo)."""
 import json
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -19,6 +20,7 @@ class Trazador:
             "paso": self.paso,
             "tipo": tipo,
             "hora_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "t_ms": time.time_ns() // 1_000_000,
             **detalle,
         }
         with self.archivo.open("a", encoding="utf-8") as f:

@@ -15,6 +15,7 @@ from pathlib import Path
 
 from agent.agente_base import AgenteBase
 from agent.grafo import EstadoPlan, construir_grafo
+from agent.metricas import medir_llamada
 from agent.observabilidad import traceable
 from agent.prompts import SISTEMA_BASE, armar_usuario
 from tools.rastreo import (
@@ -342,6 +343,7 @@ class AgenteRastreo(AgenteBase):
             "archivo_trace": str(self.trazador.archivo),
         }
 
+    @medir_llamada("planificar")
     @traceable("planificar")
     def planificar(
         self,

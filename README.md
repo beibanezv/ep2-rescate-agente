@@ -13,7 +13,7 @@ pronóstico ficticios. No apto para operaciones reales.
 ```powershell
 uv sync
 uv run python -m ingestion.ingest          # corpus -> Chroma (2/2 MATCH)
-uv run python -m pytest -q                 # 19 passed (motor 8 + dominio 6 + consulta 5)
+uv run python -m pytest -q                 # 27 passed + 4 del arnés de métricas = 31
 
 # Deja el estado limpio: borra planes/trazas/memoria y restaura clima-base.json
 uv run python scripts/reset_demo.py
@@ -75,6 +75,14 @@ cada respuesta muestra modelo, latencia y número de herramientas.
 Si la consulta está fuera del operativo (por ejemplo, "¿cuál es la capital de
 Francia?"), responde con un rechazo explícito y ejemplos, sin gastar LLM ni
 crear archivos. Es la misma puerta de dominio que usa `planificar`.
+
+### Panel de observabilidad
+
+Debajo de la conversación, la sección **Observabilidad** muestra la última
+corrida y el histórico de `logs/metricas.jsonl`: latencia total y por fase
+(según `t_ms` de `logs/trace.jsonl`), memoria pico (`tracemalloc`), tasa de
+error y percentiles p50/p95. El panel de **Trazabilidad** sigue mostrando los
+últimos 18 eventos del agente.
 
 ## Arquitectura
 

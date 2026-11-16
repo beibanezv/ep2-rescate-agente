@@ -23,6 +23,7 @@ RAIZ = Path(__file__).resolve().parent
 load_dotenv(RAIZ / ".env")
 
 from agent.llm_client import ClienteFalso, ClienteLangChain
+from agent.metricas import fases_desde_trace, leer_metricas, resumen
 from agent.observabilidad import init_langsmith
 from agent.rastreo import AgenteRastreo
 from agent.trace import Trazador
@@ -407,7 +408,7 @@ def _trace_html(resultado: dict | None, trace: list[dict], plan: dict | None) ->
         detalle = " · ".join(
             f"{k}={str(v)[:80]}"
             for k, v in evento.items()
-            if k not in ("paso", "tipo", "hora_utc")
+            if k not in ("paso", "tipo", "hora_utc", "t_ms")
         )
         filas.append(
             '<div class="trace-row">'
@@ -432,6 +433,36 @@ def _trace_html(resultado: dict | None, trace: list[dict], plan: dict | None) ->
         f'<ul class="citas">{citas_html}</ul>'
     )
     return _panel("Trazabilidad", _trazador_actual().archivo.name, cuerpo)
+
+
+def _dashboard_html(resultado: dict | None, trace: list[dict]) -> str:
+    if not resultado:
+        return _empty("Observabilidad", "latencia · errores · memoria")
+    mediciones = leer_metricas()
+    if not mediciones:
+        return _panel("Observabilidad", "sin datos", _empty("Sin métricas", "ejecuta una consulta"))
+    actual = mediciones[-1]
+    historico = resumen(mediciones)
+    fases = fases_desde_trace(trace)
+    max_fase = max((f["latencia_ms"] for f in fases), default=0) or 1
+    filas = "".join(
+        f'<div class="fase-row"><span>{_e(f["de"])} → {_e(f["a"])}</span>'
+        f'<span>{f["latencia_ms"]:.0f} ms</span>'
+        f'<span class="fase-bar" style="width:{max(2, round(100 * f["latencia_ms"] / max_fase))}%"></span></div>'
+        for f in fases
+    )
+    cuerpo = filas or '<div class="kv"><span>Fases</span><b>sin registro</b></div>'
+    cuerpo += (
+        '<div class="kv">'
+        f'<span>Latencia total</span><b>{actual["latencia_ms"]:.0f} ms</b>'
+        f'<span>Memoria pico</span><b>{actual["memoria_pico_kb"]:.0f} KB</b>'
+        f'<span>Error</span><b>{_e(actual["error"] or "—")}</b>'
+        f'<span>p50 / p95</span><b>{historico["latencia_p50_ms"]:.0f} / {historico["latencia_p95_ms"]:.0f} ms</b>'
+        f'<span>Tasa de error</span><b>{historico["tasa_error"]:.0%}</b>'
+        f'<span>Muestras</span><b>{historico["n"]}</b>'
+        '</div>'
+    )
+    return _panel("Observabilidad", "última corrida · histórico", cuerpo)
 
 
 def _ruta_corta() -> str:
@@ -752,6 +783,8 @@ h1, h2, h3 { letter-spacing: -0.02em; }
 .trace-step { color: var(--dim); }
 .trace-type { color: var(--accent); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .trace-detail { color: var(--muted); overflow-wrap: anywhere; }
+.fase-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.25rem 0.5rem; padding: 0.28rem 0; border-bottom: 1px dashed rgba(70,83,87,0.4); font: 0.6rem/1.4 var(--mono); color: var(--muted); }
+.fase-bar { grid-column: 1 / -1; height: 3px; background: var(--accent); border-radius: 2px; }
 .citas { margin: 0; padding-left: 0.9rem; color: var(--muted); font-size: 0.66rem; line-height: 1.5; }
 .citas li { margin-bottom: 0.2rem; }
 .empty { padding: 1rem 0.7rem; border: 1px dashed var(--line); text-align: center; }
@@ -912,6 +945,8 @@ if boton_consulta:
     _consultar(consulta or CONSULTA_DEFECTO, sesion, fake)
 if boton_replan:
     _publicar(2, "replanifica el operativo por el viento", sesion, fake)
+
+st.markdown(_dashboard_html(resultado, trace), unsafe_allow_html=True)
 
 columnas = st.columns([1.05, 1.3, 1.05])
 with columnas[0]:
